@@ -20,26 +20,34 @@ logger = logging.getLogger(__name__)
 
 class VideoSummarizationProcessor:
     """
-    Processes video summarization data and converts it to a Neo4j knowledge graph.
+    Processes video summarization data and converts it to a Neo4j knowledge graph
+    with automatic duplicate resolution.
     """
     
-    def __init__(self, neo4j_client: Neo4jClient = None, llm=None):
+    def __init__(self, neo4j_client: Neo4jClient = None, llm=None, enable_resolution: bool = True):
         """
         Initialize the processor.
         
         Args:
             neo4j_client: Optional Neo4j client instance
             llm: Optional LLM instance for knowledge extraction
+            enable_resolution: Whether to enable graph resolution for duplicates
         """
-        self.neo4j_client = neo4j_client or Neo4jClient()
+        # Initialize LLM first
         self.llm = llm or ChatOpenAI(
             api_key=getattr(settings, 'OPENAI_API_KEY', ''),
             model="gpt-4o-mini",
             temperature=0.0
         )
         
+        # Initialize Neo4j client with LLM for resolution
+        self.neo4j_client = neo4j_client or Neo4jClient(llm=self.llm if enable_resolution else None)
+        self.enable_resolution = enable_resolution
+        
         # Ensure indexes are created
         self.neo4j_client.create_indexes()
+        
+        logger.info(f"VideoSummarizationProcessor initialized with resolution: {enable_resolution}")
     
     def validate_payload(self, payload: Dict[str, Any]) -> bool:
         """
@@ -184,12 +192,18 @@ class VideoSummarizationProcessor:
         
         for entity in entities:
             try:
+                # Ensure all required fields are present
                 entity_data = {
-                    'name': entity['name'],
-                    'type': entity['type'],
-                    'description': f"{entity['type']}: {entity['name']}",
-                    'confidence': 1.0  # Default confidence
+                    'name': entity.get('name', ''),
+                    'type': entity.get('type', 'Unknown'),
+                    'description': entity.get('description', f"{entity.get('type', 'Unknown')}: {entity.get('name', '')}"),
+                    'confidence': entity.get('confidence', 1.0)  # Default confidence
                 }
+                
+                # Skip entities with empty names
+                if not entity_data['name'].strip():
+                    logger.warning(f"Skipping entity with empty name: {entity}")
+                    continue
                 
                 entity_name = self.neo4j_client.upsert_entity(entity_data)
                 entity_names.append(entity_name)
@@ -243,7 +257,7 @@ class VideoSummarizationProcessor:
         Args:
             video_id: Video identifier
             entities: List of extracted entities
-            relations: List of relationships between entities
+            relations: List of relationships between entities (as tuples or dicts)
         """
         try:
             # Create Video MENTIONS Entity relationships
@@ -257,15 +271,18 @@ class VideoSummarizationProcessor:
             
             # Create relationships between entities
             entity_relations = []
-            for subject, relation, obj in relations:
-                entity_relations.append({
-                    'subject': subject,
-                    'relation': relation,
-                    'object': obj
-                })
+            for relation in relations:
+                if isinstance(relation, tuple) and len(relation) == 3:
+                    entity_relations.append({
+                        'subject': relation[0],
+                        'relation': relation[1],
+                        'object': relation[2]
+                    })
+                elif isinstance(relation, dict):
+                    entity_relations.append(relation)
             
             if entity_relations:
-                self.neo4j_client.create_entity_relationships(entity_relations)
+                self.neo4j_client.create_entity_relationships(entity_relations, video_id)
             
             logger.info(f"Created {len(entities)} entity mentions and "
                        f"{len(entity_relations)} inter-entity relationships")
@@ -303,18 +320,59 @@ class VideoSummarizationProcessor:
             # Step 2: Upsert metadata nodes
             node_ids = self.upsert_metadata_nodes(payload)
             
-            # Step 3: Upsert entities
-            entity_names = self.upsert_entities(kg_result['entities'])
+            # Step 3: Upsert entities and relationships with resolution
+            if self.enable_resolution:
+                # Ensure entities have all required fields before resolution
+                normalized_entities = []
+                for entity in kg_result['entities']:
+                    normalized_entity = {
+                        'name': entity.get('name', ''),
+                        'type': entity.get('type', 'Unknown'),
+                        'description': entity.get('description', f"{entity.get('type', 'Unknown')}: {entity.get('name', '')}"),
+                        'confidence': entity.get('confidence', 1.0)
+                    }
+                    # Skip entities with empty names
+                    if normalized_entity['name'].strip():
+                        normalized_entities.append(normalized_entity)
+                
+                # Convert relationship tuples to dictionaries for resolution
+                relationship_dicts = []
+                for rel_tuple in kg_result['resolved_relations']:
+                    if isinstance(rel_tuple, tuple) and len(rel_tuple) == 3:
+                        relationship_dicts.append({
+                            'subject': rel_tuple[0],
+                            'relation': rel_tuple[1],
+                            'object': rel_tuple[2]
+                        })
+                    elif isinstance(rel_tuple, dict):
+                        relationship_dicts.append(rel_tuple)
+                
+                # Use advanced upsert with graph resolution
+                resolution_stats = self.neo4j_client.upsert_knowledge_graph_with_resolution(
+                    video_id=node_ids['video'],
+                    entities=normalized_entities,
+                    relationships=relationship_dicts,
+                    enable_resolution=True
+                )
+                entity_names = [
+                    e['name'] for e in normalized_entities 
+                    if e['name'] not in resolution_stats.get('entity_mappings', {})
+                ]
+            else:
+                # Standard upsert without resolution
+                entity_names = self.upsert_entities(kg_result['entities'])
+                resolution_stats = {'resolution_disabled': True}
             
             # Step 4: Create metadata relationships
             self.create_metadata_relationships(node_ids)
             
-            # Step 5: Create entity relationships
-            self.create_entity_relationships(
-                node_ids['video'], 
-                kg_result['entities'], 
-                kg_result['resolved_relations']
-            )
+            # Step 5: Create entity relationships (if not using resolution)
+            if not self.enable_resolution:
+                self.create_entity_relationships(
+                    node_ids['video'], 
+                    kg_result['entities'], 
+                    kg_result['resolved_relations']
+                )
             
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -330,10 +388,18 @@ class VideoSummarizationProcessor:
                 'upserted_entities': len(entity_names),
                 'node_ids': node_ids,
                 'graph_statistics': graph_stats,
-                'kg_validation': kg_result['validation']
+                'kg_validation': kg_result['validation'],
+                'resolution_enabled': self.enable_resolution,
             }
             
-            logger.info(f"Successfully processed video summarization in {processing_time:.2f}s")
+            # Add resolution statistics if available
+            if 'resolution_stats' in locals():
+                result['resolution_statistics'] = resolution_stats
+                if 'entity_mappings' in resolution_stats:
+                    result['resolved_entities_count'] = len(resolution_stats['entity_mappings'])
+            
+            logger.info(f"Successfully processed video summarization in {processing_time:.2f}s "
+                       f"(resolution: {'enabled' if self.enable_resolution else 'disabled'})")
             return result
             
         except Exception as e:

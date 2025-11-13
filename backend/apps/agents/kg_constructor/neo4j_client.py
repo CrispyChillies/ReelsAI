@@ -2,7 +2,7 @@
 Neo4j client for Knowledge Graph integration.
 
 This module provides functionality to connect to Neo4j and upsert knowledge graphs
-from video summarization data.
+from video summarization data with graph resolution capabilities.
 """
 
 import logging
@@ -10,16 +10,17 @@ from typing import Dict, List, Any, Optional
 from neo4j import GraphDatabase, Driver
 from django.conf import settings
 import json
+from .graph_resolution import GraphResolutionEngine, create_graph_resolution_indexes
 
 logger = logging.getLogger(__name__)
 
 
 class Neo4jClient:
     """
-    Neo4j database client for knowledge graph operations.
+    Neo4j database client for knowledge graph operations with resolution capabilities.
     """
     
-    def __init__(self, uri: str = None, username: str = None, password: str = None):
+    def __init__(self, uri: str = None, username: str = None, password: str = None, llm=None):
         """
         Initialize Neo4j client.
         
@@ -27,13 +28,20 @@ class Neo4jClient:
             uri: Neo4j URI (defaults to settings.NEO4J_URI)
             username: Neo4j username (defaults to settings.NEO4J_USERNAME)
             password: Neo4j password (defaults to settings.NEO4J_PASSWORD)
+            llm: Language model for graph resolution
         """
         self.uri = uri or getattr(settings, 'NEO4J_URI', 'bolt://localhost:7687')
         self.username = username or getattr(settings, 'NEO4J_USERNAME', 'neo4j')
         self.password = password or getattr(settings, 'NEO4J_PASSWORD', 'password')
         
         self._driver: Optional[Driver] = None
+        self._resolution_engine: Optional[GraphResolutionEngine] = None
         self._connect()
+        
+        # Initialize resolution engine if LLM is provided
+        if llm:
+            self._resolution_engine = GraphResolutionEngine(self._driver, llm)
+            logger.info("Graph resolution engine initialized")
     
     def _connect(self):
         """Establish connection to Neo4j database."""
@@ -97,12 +105,15 @@ class Neo4jClient:
         ]
         
         with self._driver.session() as session:
-            for index_query in indexes:
+            for index in indexes:
                 try:
-                    session.run(index_query)
-                    logger.info(f"Created index: {index_query}")
+                    session.run(index)
+                    logger.info(f"Created index: {index}")
                 except Exception as e:
                     logger.warning(f"Index creation failed (may already exist): {e}")
+        
+        # Create resolution-specific indexes
+        create_graph_resolution_indexes(self._driver)
     
     def upsert_user(self, user_data: Dict[str, Any]) -> str:
         """
@@ -197,12 +208,13 @@ class Neo4jClient:
             result = session.run(query, **source_data)
             return result.single()["name"]
     
-    def upsert_entity(self, entity_data: Dict[str, Any]) -> str:
+    def upsert_entity(self, entity_data: Dict[str, Any], video_id: str = None) -> str:
         """
         Upsert an Entity node.
         
         Args:
             entity_data: Dictionary containing entity information
+            video_id: Optional video ID for tracking entity source
             
         Returns:
             Entity name
@@ -217,8 +229,66 @@ class Neo4jClient:
         """
         
         with self._driver.session() as session:
+            # First upsert the entity
             result = session.run(query, **entity_data)
-            return result.single()["name"]
+            entity_name = result.single()["name"]
+            
+            # Then create the MENTIONS relationship if video_id is provided
+            if video_id:
+                mention_query = """
+                MATCH (v:Video {video_id: $video_id})
+                MATCH (e:Entity {name: $entity_name})
+                MERGE (v)-[r:MENTIONS]->(e)
+                SET r.created_at = COALESCE(r.created_at, datetime())
+                RETURN r
+                """
+                session.run(mention_query, video_id=video_id, entity_name=entity_name)
+            
+            return entity_name
+        
+    def upsert_relationship(self, relationship_data: Dict[str, Any], video_id: str = None):
+        """
+        Upsert a relationship between two entities.
+        
+        Args:
+            relationship_data: Dictionary containing 'subject', 'relation', 'object'
+            video_id: Optional video ID for tracking relationship source
+        """
+        query = """
+        MATCH (e1:Entity {name: $subject})
+        MATCH (e2:Entity {name: $object})
+        CALL apoc.create.relationship(e1, $relation_type, {
+            created_at: datetime(),
+            source: 'kg_extraction',
+            video_id: $video_id
+        }, e2) YIELD rel
+        RETURN rel
+        """
+        
+        with self._driver.session() as session:
+            try:
+                session.run(query,
+                           subject=relationship_data['subject'],
+                           object=relationship_data['object'],
+                           relation_type=relationship_data['relation'].upper(),
+                           video_id=video_id)
+            except Exception as e:
+                # Fallback to creating a generic RELATED relationship if APOC is not available
+                fallback_query = """
+                MATCH (e1:Entity {name: $subject})
+                MATCH (e2:Entity {name: $object})
+                MERGE (e1)-[r:RELATED]->(e2)
+                SET r.relation_type = $relation_type,
+                    r.created_at = datetime(),
+                    r.source = 'kg_extraction',
+                    r.video_id = $video_id
+                RETURN r
+                """
+                session.run(fallback_query,
+                           subject=relationship_data['subject'],
+                           object=relationship_data['object'],
+                           relation_type=relationship_data['relation'],
+                           video_id=video_id)
     
     def create_user_cares_video_relationship(self, user_id: str, video_id: str, 
                                            properties: Dict[str, Any] = None):
@@ -319,46 +389,17 @@ class Neo4jClient:
                        video_id=video_id,
                        source_name=source_name,
                        properties=properties or {})
-    
-    def create_entity_relationships(self, relations: List[Dict[str, Any]]):
+
+    def create_entity_relationships(self, relations: List[Dict[str, Any]], video_id: str = None):
         """
         Create relationships between entities based on extracted relations.
         
         Args:
             relations: List of relationship dictionaries with 'subject', 'relation', 'object'
+            video_id: Optional video ID for tracking relationship source
         """
         for relation in relations:
-            query = """
-            MATCH (e1:Entity {name: $subject})
-            MATCH (e2:Entity {name: $object})
-            CALL apoc.create.relationship(e1, $relation_type, {
-                created_at: datetime(),
-                source: 'kg_extraction'
-            }, e2) YIELD rel
-            RETURN rel
-            """
-            
-            with self._driver.session() as session:
-                try:
-                    session.run(query,
-                               subject=relation['subject'],
-                               object=relation['object'],
-                               relation_type=relation['relation'].upper())
-                except Exception as e:
-                    # Fallback to creating a generic RELATED relationship if APOC is not available
-                    fallback_query = """
-                    MATCH (e1:Entity {name: $subject})
-                    MATCH (e2:Entity {name: $object})
-                    MERGE (e1)-[r:RELATED]->(e2)
-                    SET r.relation_type = $relation_type,
-                        r.created_at = datetime(),
-                        r.source = 'kg_extraction'
-                    RETURN r
-                    """
-                    session.run(fallback_query,
-                               subject=relation['subject'],
-                               object=relation['object'],
-                               relation_type=relation['relation'])
+            self.upsert_relationship(relation, video_id)
     
     def get_graph_stats(self) -> Dict[str, Any]:
         """
@@ -453,3 +494,163 @@ class Neo4jClient:
             "nodes": nodes,
             "relationships": relationships
         }
+    
+    # Graph Resolution Methods
+    
+    def upsert_knowledge_graph_with_resolution(self, video_id: str, entities: List[Dict[str, str]], 
+                                              relationships: List[Dict[str, str]], 
+                                              enable_resolution: bool = True) -> Dict[str, Any]:
+        """
+        Upsert knowledge graph with automatic resolution of duplicates.
+        
+        Args:
+            video_id: Video identifier
+            entities: List of entity dictionaries
+            relationships: List of relationship dictionaries
+            enable_resolution: Whether to use LLM-based resolution
+            
+        Returns:
+            Dictionary with resolution statistics and mappings
+        """
+        if enable_resolution and self._resolution_engine:
+            # Convert relationships to tuples for resolution
+            relationship_tuples = [
+                (rel['subject'], rel['relation'], rel['object'])
+                for rel in relationships
+            ]
+            
+            # Perform graph resolution
+            resolution_stats = self._resolution_engine.resolve_and_merge_video_graph(
+                video_id, entities, relationship_tuples
+            )
+            
+            # Apply entity mappings to relationships
+            entity_mappings = resolution_stats['entity_mappings']
+            resolved_relationships = []
+            
+            for rel in relationships:
+                resolved_rel = rel.copy()
+                resolved_rel['subject'] = entity_mappings.get(rel['subject'], rel['subject'])
+                resolved_rel['object'] = entity_mappings.get(rel['object'], rel['object'])
+                resolved_relationships.append(resolved_rel)
+            
+            # Upsert only non-duplicate entities
+            entities_to_upsert = [
+                entity for entity in entities 
+                if entity['name'] not in entity_mappings
+            ]
+            
+        else:
+            # Standard upsert without resolution
+            entities_to_upsert = entities
+            resolved_relationships = relationships
+            resolution_stats = {'entity_mappings': {}, 'resolution_disabled': True}
+        
+        # Proceed with standard upsert for remaining entities
+        for entity in entities_to_upsert:
+            self.upsert_entity(entity, video_id)
+        
+        for relationship in resolved_relationships:
+            self.upsert_relationship(relationship, video_id)
+        
+        return resolution_stats
+    
+    def get_resolution_statistics(self, video_id: str = None) -> Dict[str, Any]:
+        """
+        Get graph resolution statistics.
+        
+        Args:
+            video_id: Optional specific video ID
+            
+        Returns:
+            Dictionary containing resolution statistics
+        """
+        if not self._resolution_engine:
+            return {"error": "Resolution engine not available"}
+        
+        from .graph_resolution import get_resolution_statistics
+        return get_resolution_statistics(self._driver, video_id)
+    
+    def get_conflict_flags(self, status: str = 'pending_review') -> List[Dict[str, Any]]:
+        """
+        Get conflict flags that need manual review.
+        
+        Args:
+            status: Conflict status to filter by
+            
+        Returns:
+            List of conflict flag dictionaries
+        """
+        query = """
+        MATCH (c:ConflictFlag)
+        WHERE c.status = $status
+        RETURN c.video_id as video_id,
+               c.new_relationship as new_relationship,
+               c.existing_relationship as existing_relationship,
+               c.reason as reason,
+               c.created_at as created_at
+        ORDER BY c.created_at DESC
+        """
+        
+        with self._driver.session() as session:
+            result = session.run(query, status=status)
+            return [dict(record) for record in result]
+    
+    def resolve_conflict(self, video_id: str, new_relationship: str, 
+                        existing_relationship: str, resolution: str, 
+                        resolved_by: str = None) -> bool:
+        """
+        Manually resolve a conflict flag.
+        
+        Args:
+            video_id: Video ID where conflict occurred
+            new_relationship: New relationship string
+            existing_relationship: Existing relationship string
+            resolution: Resolution decision ('keep_existing', 'use_new', 'merge')
+            resolved_by: User who resolved the conflict
+            
+        Returns:
+            True if resolution was successful
+        """
+        try:
+            with self._driver.session() as session:
+                # Update conflict flag
+                session.run("""
+                    MATCH (c:ConflictFlag {
+                        video_id: $video_id,
+                        new_relationship: $new_relationship,
+                        existing_relationship: $existing_relationship
+                    })
+                    SET c.status = 'resolved',
+                        c.resolution = $resolution,
+                        c.resolved_by = $resolved_by,
+                        c.resolved_at = datetime()
+                    RETURN c
+                """, 
+                video_id=video_id,
+                new_relationship=new_relationship,
+                existing_relationship=existing_relationship,
+                resolution=resolution,
+                resolved_by=resolved_by)
+                
+                logger.info(f"Conflict resolved for video {video_id}: {resolution}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to resolve conflict: {e}")
+            return False
+    
+    def enable_resolution_engine(self, llm):
+        """
+        Enable the graph resolution engine with an LLM.
+        
+        Args:
+            llm: Language model for resolution decisions
+        """
+        self._resolution_engine = GraphResolutionEngine(self._driver, llm)
+        logger.info("Graph resolution engine enabled")
+    
+    def disable_resolution_engine(self):
+        """Disable the graph resolution engine."""
+        self._resolution_engine = None
+        logger.info("Graph resolution engine disabled")

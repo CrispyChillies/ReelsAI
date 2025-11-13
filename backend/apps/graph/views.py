@@ -344,3 +344,166 @@ def test_neo4j_connection(request):
             'connected': False,
             'message': f'Connection test failed: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_resolution_statistics(request):
+    """
+    Get graph resolution statistics.
+    
+    Query parameters:
+    - video_id: Optional specific video ID
+    """
+    try:
+        video_id = request.GET.get('video_id', None)
+        
+        neo4j_client = Neo4jClient()
+        stats = neo4j_client.get_resolution_statistics(video_id)
+        neo4j_client.close()
+        
+        return Response({
+            'resolution_statistics': stats,
+            'video_id': video_id
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error getting resolution statistics: {e}")
+        return Response({
+            'error': f'Failed to get resolution statistics: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_conflict_flags(request):
+    """
+    Get conflict flags that need manual review.
+    
+    Query parameters:
+    - status: Filter by conflict status (default: 'pending_review')
+    """
+    try:
+        conflict_status = request.GET.get('status', 'pending_review')
+        
+        neo4j_client = Neo4jClient()
+        conflicts = neo4j_client.get_conflict_flags(conflict_status)
+        neo4j_client.close()
+        
+        return Response({
+            'conflicts': conflicts,
+            'count': len(conflicts),
+            'status_filter': conflict_status
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error getting conflict flags: {e}")
+        return Response({
+            'error': f'Failed to get conflict flags: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def resolve_conflict(request):
+    """
+    Manually resolve a conflict flag.
+    
+    Expected payload:
+    {
+        "video_id": "video_123",
+        "new_relationship": "[\"EntityA\", \"relates_to\", \"EntityB\"]",
+        "existing_relationship": "[\"EntityA\", \"connects_to\", \"EntityB\"]",
+        "resolution": "keep_existing",  # Options: "keep_existing", "use_new", "merge"
+        "comment": "Optional resolution comment"
+    }
+    """
+    try:
+        data = request.data
+        
+        # Validate required fields
+        required_fields = ['video_id', 'new_relationship', 'existing_relationship', 'resolution']
+        for field in required_fields:
+            if field not in data:
+                return Response({
+                    'error': f'Missing required field: {field}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate resolution value
+        valid_resolutions = ['keep_existing', 'use_new', 'merge']
+        if data['resolution'] not in valid_resolutions:
+            return Response({
+                'error': f'Invalid resolution. Must be one of: {valid_resolutions}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        neo4j_client = Neo4jClient()
+        success = neo4j_client.resolve_conflict(
+            video_id=data['video_id'],
+            new_relationship=data['new_relationship'],
+            existing_relationship=data['existing_relationship'],
+            resolution=data['resolution'],
+            resolved_by=request.user.username if hasattr(request.user, 'username') else 'api_user'
+        )
+        neo4j_client.close()
+        
+        if success:
+            return Response({
+                'message': 'Conflict resolved successfully',
+                'resolution': data['resolution']
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'error': 'Failed to resolve conflict'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    except Exception as e:
+        logger.error(f"Error resolving conflict: {e}")
+        return Response({
+            'error': f'Failed to resolve conflict: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_resolution_engine(request):
+    """
+    Enable or disable the graph resolution engine.
+    
+    Expected payload:
+    {
+        "enable": true  // Boolean to enable/disable resolution
+    }
+    """
+    try:
+        data = request.data
+        enable = data.get('enable', True)
+        
+        if enable:
+            # Initialize processor with resolution enabled
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(
+                api_key=getattr(settings, 'OPENAI_API_KEY', ''),
+                model="gpt-4o-mini",
+                temperature=0.0
+            )
+            processor = VideoSummarizationProcessor(enable_resolution=True, llm=llm)
+            message = 'Graph resolution engine enabled'
+        else:
+            # Initialize processor without resolution
+            processor = VideoSummarizationProcessor(enable_resolution=False)
+            message = 'Graph resolution engine disabled'
+        
+        # Test that processor works
+        processor.neo4j_client.test_connection()
+        processor.neo4j_client.close()
+        
+        return Response({
+            'message': message,
+            'resolution_enabled': enable
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error toggling resolution engine: {e}")
+        return Response({
+            'error': f'Failed to toggle resolution engine: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
