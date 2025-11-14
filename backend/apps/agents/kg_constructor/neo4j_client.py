@@ -401,6 +401,77 @@ class Neo4jClient:
         for relation in relations:
             self.upsert_relationship(relation, video_id)
     
+    def check_video_exists(self, video_id: str) -> bool:
+        """
+        Check if a video already exists in the graph.
+        
+        Args:
+            video_id: Video identifier
+            
+        Returns:
+            True if video exists, False otherwise
+        """
+        query = "MATCH (v:Video {video_id: $video_id}) RETURN v LIMIT 1"
+        
+        with self._driver.session() as session:
+            result = session.run(query, video_id=video_id)
+            return result.single() is not None
+    
+    def check_user_video_relationship(self, user_id: str, video_id: str) -> bool:
+        """
+        Check if a user already has a CARES relationship with a video.
+        
+        Args:
+            user_id: User identifier
+            video_id: Video identifier
+            
+        Returns:
+            True if relationship exists, False otherwise
+        """
+        query = """
+        MATCH (u:User {user_id: $user_id})-[r:CARES]->(v:Video {video_id: $video_id})
+        RETURN r LIMIT 1
+        """
+        
+        with self._driver.session() as session:
+            result = session.run(query, user_id=user_id, video_id=video_id)
+            return result.single() is not None
+    
+    def get_video_details(self, video_id: str) -> Dict[str, Any]:
+        """
+        Get detailed information about an existing video.
+        
+        Args:
+            video_id: Video identifier
+            
+        Returns:
+            Dictionary containing video details and related entities
+        """
+        query = """
+        MATCH (v:Video {video_id: $video_id})
+        OPTIONAL MATCH (v)-[:ABOUT]->(t:Topic)
+        OPTIONAL MATCH (v)-[:FROM]->(s:Source)
+        OPTIONAL MATCH (v)-[:MENTIONS]->(e:Entity)
+        RETURN v, 
+               collect(DISTINCT t) as topics,
+               collect(DISTINCT s) as sources,
+               collect(DISTINCT e) as entities
+        """
+        
+        with self._driver.session() as session:
+            result = session.run(query, video_id=video_id)
+            record = result.single()
+            
+            if not record:
+                return None
+                
+            return {
+                'video': dict(record['v']),
+                'topics': [dict(topic) for topic in record['topics'] if topic],
+                'sources': [dict(source) for source in record['sources'] if source],
+                'entities': [dict(entity) for entity in record['entities'] if entity]
+            }
+
     def get_graph_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the graph database.

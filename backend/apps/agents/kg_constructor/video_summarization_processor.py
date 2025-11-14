@@ -291,29 +291,98 @@ class VideoSummarizationProcessor:
             logger.error(f"Failed to create entity relationships: {e}")
             raise
     
-    def process_video_summarization(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_existing_video_new_user(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
         """
-        Complete pipeline to process video summarization and create knowledge graph.
+        Handle case where video exists but user is new.
         
         Args:
             payload: Video summarization payload
+            start_time: Processing start time
             
         Returns:
-            Processing result with statistics and status
+            Processing result
         """
-        start_time = datetime.now()
-        
         try:
-            # Validate payload
-            if not self.validate_payload(payload):
-                raise ValueError("Invalid payload structure")
+            user_id = payload['user']['user_id']
+            video_id = payload['video']['video_id']
             
-            # Extract basic info
+            # Upsert user node
+            user_data = payload['user'].copy()
+            user_data.setdefault('name', f"User_{user_data['user_id']}")
+            user_data.setdefault('email', '')
+            user_data.setdefault('created_at', datetime.now().isoformat())
+            
+            user_node_id = self.neo4j_client.upsert_user(user_data)
+            logger.info(f"Upserted user: {user_node_id}")
+            
+            # Create user-video relationship
+            self.neo4j_client.create_user_cares_video_relationship(
+                user_id,
+                video_id,
+                {'relationship_type': 'engagement', 'weight': 1.0, 'created_via': 'existing_video'}
+            )
+            
+            # Get video details for response
+            video_details = self.neo4j_client.get_video_details(video_id)
+            
+            processing_time = (datetime.now() - start_time).total_seconds()
+            
+            # Get graph statistics for consistency
+            graph_stats = self.neo4j_client.get_graph_stats()
+            
+            return {
+                'status': 'success',
+                'processing_type': 'existing_video_new_user',
+                'message': 'Connected user to existing video',
+                'processing_time_seconds': processing_time,
+                'user_id': user_id,
+                'video_id': video_id,
+                'video_details': video_details,
+                # Standardized fields for consistency
+                'extracted_entities': 0,  # No new extraction for existing videos
+                'extracted_relations': 0,
+                'upserted_entities': 0,
+                'node_ids': {'user': user_id, 'video': video_id},
+                'graph_statistics': graph_stats,
+                'kg_validation': {},
+                'resolution_enabled': self.enable_resolution,
+                'entities_count': len(video_details.get('entities', [])) if video_details else 0
+            }
+            
+        except Exception as e:
+            processing_time = (datetime.now() - start_time).total_seconds()
+            logger.error(f"Failed to handle existing video for new user: {e}")
+            return {
+                'status': 'error',
+                'processing_type': 'existing_video_new_user_failed',
+                'error_message': str(e),
+                'processing_time_seconds': processing_time,
+                # Standardized error fields
+                'extracted_entities': 0,
+                'extracted_relations': 0,
+                'upserted_entities': 0,
+                'node_ids': {},
+                'graph_statistics': {},
+                'kg_validation': {},
+                'resolution_enabled': self.enable_resolution
+            }
+    
+    def _handle_new_video(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
+        """
+        Handle case where video is completely new.
+        
+        Args:
+            payload: Video summarization payload
+            start_time: Processing start time
+            
+        Returns:
+            Processing result
+        """
+        try:
             topic_name = payload['topic']['name'] if isinstance(payload['topic'], dict) else payload['topic']
             summarization = payload['summarization']
             
-            logger.info(f"Processing video summarization for topic: {topic_name}")
-            
+            # Original full pipeline processing
             # Step 1: Extract knowledge graph from summarization
             kg_result = self.extract_knowledge_graph(topic_name, summarization)
             
@@ -382,6 +451,7 @@ class VideoSummarizationProcessor:
             
             result = {
                 'status': 'success',
+                'processing_type': 'new_video_full_pipeline',
                 'processing_time_seconds': processing_time,
                 'extracted_entities': len(kg_result['entities']),
                 'extracted_relations': len(kg_result['resolved_relations']),
@@ -398,16 +468,103 @@ class VideoSummarizationProcessor:
                 if 'entity_mappings' in resolution_stats:
                     result['resolved_entities_count'] = len(resolution_stats['entity_mappings'])
             
-            logger.info(f"Successfully processed video summarization in {processing_time:.2f}s "
-                       f"(resolution: {'enabled' if self.enable_resolution else 'disabled'})")
+            logger.info(f"Successfully processed new video in {processing_time:.2f}s ")
             return result
             
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             error_result = {
                 'status': 'error',
+                'processing_type': 'new_video_pipeline_failed',
                 'error_message': str(e),
                 'processing_time_seconds': processing_time,
+                # Standardized error fields
+                'extracted_entities': 0,
+                'extracted_relations': 0,
+                'upserted_entities': 0,
+                'node_ids': {},
+                'graph_statistics': {},
+                'kg_validation': {},
+                'resolution_enabled': self.enable_resolution
+            }
+            logger.error(f"Failed to process new video: {e}")
+            return error_result
+        
+    def process_video_summarization(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Complete pipeline to process video summarization and create knowledge graph.
+        
+        Args:
+            payload: Video summarization payload
+            
+        Returns:
+            Processing result with statistics and status
+        """
+        start_time = datetime.now()
+        
+        try:
+            # Validate payload
+            if not self.validate_payload(payload):
+                raise ValueError("Invalid payload structure")
+            
+            # Extract basic info
+            user_id = payload['user']['user_id']
+            video_id = payload['video']['video_id']
+            topic_name = payload['topic']['name'] if isinstance(payload['topic'], dict) else payload['topic']
+            summarization = payload['summarization']
+            
+            logger.info(f"Processing video summarization for user: {user_id}, video: {video_id}")
+            
+            # Case 1: Check if user already has this video
+            if self.neo4j_client.check_user_video_relationship(user_id, video_id):
+                processing_time = (datetime.now() - start_time).total_seconds()
+                logger.info(f"User {user_id} already has relationship with video {video_id} - skipping processing")
+                
+                # Get graph statistics for consistency
+                graph_stats = self.neo4j_client.get_graph_stats()
+                
+                return {
+                    'status': 'success',
+                    'processing_type': 'skipped_existing_relationship',
+                    'message': 'User already has this video saved',
+                    'processing_time_seconds': processing_time,
+                    'user_id': user_id,
+                    'video_id': video_id,
+                    # Standardized fields for consistency
+                    'extracted_entities': 0,  # No processing for existing relationships
+                    'extracted_relations': 0,
+                    'upserted_entities': 0,
+                    'node_ids': {'user': user_id, 'video': video_id},
+                    'graph_statistics': graph_stats,
+                    'kg_validation': {},
+                    'resolution_enabled': self.enable_resolution
+                }
+            
+            # Case 2: Check if video exists but user doesn't have it
+            video_exists = self.neo4j_client.check_video_exists(video_id)
+            
+            if video_exists:
+                logger.info(f"Video {video_id} exists - creating user relationship only")
+                return self._handle_existing_video_new_user(payload, start_time)
+            else:
+                logger.info(f"New video {video_id} - processing full pipeline")
+                return self._handle_new_video(payload, start_time)
+                
+        except Exception as e:
+            processing_time = (datetime.now() - start_time).total_seconds()
+            error_result = {
+                'status': 'error',
+                'error_message': str(e),
+                'processing_time_seconds': processing_time,
+                'processing_type': 'general_error',
+                # Standardized error fields
+                'extracted_entities': 0,
+                'extracted_relations': 0,
+                'upserted_entities': 0,
+                'node_ids': {},
+                'graph_statistics': {},
+                'kg_validation': {},
+                'resolution_enabled': self.enable_resolution
             }
             logger.error(f"Failed to process video summarization: {e}")
             return error_result

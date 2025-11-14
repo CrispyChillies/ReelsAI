@@ -4,7 +4,7 @@ import json
 
 from apps.agents.kg_constructor.video_summarization_processor import VideoSummarizationProcessor, EXAMPLE_PAYLOAD
 from apps.graph.models import KnowledgeGraphStatistics
-
+from apps.agents.kg_constructor.config import get_google_llm
 
 class Command(BaseCommand):
     help = 'Test the video summarization to Neo4j knowledge graph pipeline'
@@ -31,7 +31,7 @@ class Command(BaseCommand):
         self.stdout.write('=' * 80)
 
         try:
-            processor = VideoSummarizationProcessor()
+            processor = VideoSummarizationProcessor(llm=get_google_llm(model="gemini-2.5-flash"))
             
             # Test connection first
             if not processor.neo4j_client.test_connection():
@@ -84,10 +84,10 @@ class Command(BaseCommand):
             
             if result['status'] == 'success':
                 self.stdout.write(self.style.SUCCESS(f"✅ Status: {result['status']}"))
-                self.stdout.write(f"⏱️  Processing time: {result['processing_time_seconds']:.2f} seconds")
-                self.stdout.write(f"🔍 Extracted entities: {result['extracted_entities']}")
-                self.stdout.write(f"🔗 Extracted relations: {result['extracted_relations']}")
-                self.stdout.write(f"💾 Upserted entities: {result['upserted_entities']}")
+                self.stdout.write(f"⏱️  Processing time: {result.get('processing_time_seconds', 0):.2f} seconds")
+                self.stdout.write(f"🔍 Extracted entities: {result.get('extracted_entities', 'N/A')}")
+                self.stdout.write(f"🔗 Extracted relations: {result.get('extracted_relations', 'N/A')}")
+                self.stdout.write(f"💾 Upserted entities: {result.get('upserted_entities', 'N/A')}")
                 
                 # Display node IDs
                 if result.get('node_ids'):
@@ -124,7 +124,7 @@ class Command(BaseCommand):
                     self.stdout.write(f"  Isolated nodes: {len(isolated)}")
                 
             else:
-                self.stdout.write(self.style.ERROR(f"❌ Status: {result['status']}"))
+                self.stdout.write(self.style.ERROR(f"❌ Status: {result.get('status', 'unknown')}"))
                 self.stdout.write(self.style.ERROR(f"Error: {result.get('error_message', 'Unknown error')}"))
                 self.stdout.write(f"⏱️  Processing time: {result.get('processing_time_seconds', 0):.2f} seconds")
 
