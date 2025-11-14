@@ -14,6 +14,16 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Lấy các hashtag với industry_id = 15000000000
-response = supabase.table("HASHTAGS").select("*").eq("industry_id", 15000000000).execute()
+# Lấy tất cả hashtag của Việt Nam với đúng industry_id
+response = (
+    supabase
+        .table("HASHTAGS")
+        .select("*")
+        .eq("industry_id", 15000000000)
+        .eq("country_id", "VN")   # ⭐ Thêm dòng này
+        .range(0, 999)
+        .execute()
+)
+
 print(response.data)
+print(len(response.data))

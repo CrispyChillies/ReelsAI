@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     "corsheaders",
     "apps.users",
+    "apps.hashtag_crawling",
+    "django_extensions"
 ]
 
 MIDDLEWARE = [

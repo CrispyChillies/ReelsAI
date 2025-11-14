@@ -22,7 +22,7 @@ from apps.hashtag_crawling.urls import urlpatterns as hashtag_urls
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.users.urls")),
-    path("api/hashtags/", include("apps.hashtag_crawling.urls")),
+    path('api/', include('apps.hashtag_crawling.urls')),
     # Swagger UI endpoints
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
