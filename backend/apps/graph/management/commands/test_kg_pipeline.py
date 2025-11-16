@@ -31,7 +31,7 @@ class Command(BaseCommand):
         self.stdout.write('=' * 80)
 
         try:
-            processor = VideoSummarizationProcessor(llm=get_google_llm(model="gemini-2.5-flash"))
+            processor = VideoSummarizationProcessor()
             
             # Test connection first
             if not processor.neo4j_client.test_connection():

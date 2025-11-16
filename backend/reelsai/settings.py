@@ -209,6 +209,7 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Memoria")
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Neo4j Configuration
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
