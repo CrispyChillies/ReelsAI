@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sentence_transformers import SentenceTransformer
-from milvus_setup import collection
+from backend.apps.rag.milvus_setup import collection
 
 # ========= EMBEDDING MODEL =========
 model = SentenceTransformer("keepitreal/vietnamese-sbert")
