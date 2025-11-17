@@ -12,7 +12,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 
-from system_prompts import *
+from .system_prompts import ENTITY_EXTRACTOR_PROMPT, RELATION_EXTRACTOR_PROMPT, ENTITY_RESOLVER_PROMPT
 
 # Entity types for extraction
 ENTITY_TYPES = ["Person", "Organization", "Location", "Product", "Concept", "Event", "Other"]
@@ -409,7 +409,7 @@ if __name__ == "__main__":
     Self-driving cars, developed by companies like Tesla and Waynes, rely heavily on AI and computer vision 
     technologies.
     """
-    
+
     try:
         llm = ChatOpenAI(
             api_key=settings.OPENAI_API_KEY,
