@@ -1,0 +1,11 @@
+:root {
+  --font-body: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 900;
+}
+
+body, button, input, textarea, select {
+  font-family: var(--font-body);
+}
