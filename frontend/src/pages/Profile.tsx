@@ -708,14 +708,65 @@ export default function Profile() {
 
 /* ===================== styles ===================== */
 const Wrap = styled.div`
+  position: relative;
+  min-height: 100vh;
+  background: #ffffff;
   padding: 20px;
-  max-width: 920px;
-  margin: 0 auto;
   
-  /* Subtle background pattern */
-  background: 
-    radial-gradient(circle at 20% 10%, rgba(13, 148, 136, 0.03) 0%, transparent 40%),
-    radial-gradient(circle at 80% 90%, rgba(13, 148, 136, 0.02) 0%, transparent 40%);
+  /* Grid lines - full viewport width but start from sidebar edge */
+  &::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 280px; /* sidebar width */
+    right: 0;
+    z-index: 0;
+    background-image: 
+      linear-gradient(to right, rgba(13, 148, 136, 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(13, 148, 136, 0.15) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(0,0,0,0.6) 0%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(0,0,0,0.6) 0%, transparent 85%);
+    pointer-events: none;
+  }
+  
+  /* Subtle teal glow at top */
+  &::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 280px; /* sidebar width */
+    right: 0;
+    height: 200px;
+    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(13, 148, 136, 0.03), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  /* Content wrapper with max-width */
+  > * {
+    position: relative;
+    z-index: 1;
+    max-width: 920px;
+    margin: 0 auto;
+  }
+  
+  /* Responsive: adjust for collapsed sidebar */
+  @media (max-width: 1280px) {
+    &::before,
+    &::after {
+      left: 68px; /* collapsed sidebar width */
+    }
+  }
+  
+  /* Responsive: mobile - full width grid */
+  @media (max-width: 980px) {
+    &::before,
+    &::after {
+      left: 0;
+    }
+  }
 
   .card {
     background: rgba(255, 255, 255, 0.95);

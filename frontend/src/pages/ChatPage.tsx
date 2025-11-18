@@ -426,8 +426,8 @@ const Main = styled.div`
     inset: 0;
     z-index: 0;
     background-image: 
-      linear-gradient(to right, rgba(13, 148, 136, 0.08) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(13, 148, 136, 0.08) 1px, transparent 1px);
+      linear-gradient(to right, rgba(13, 148, 136, 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(13, 148, 136, 0.15) 1px, transparent 1px);
     background-size: 40px 40px;
     mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(0,0,0,0.6) 0%, transparent 85%);
     -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(0,0,0,0.6) 0%, transparent 85%);
