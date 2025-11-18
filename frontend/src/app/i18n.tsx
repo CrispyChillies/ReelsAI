@@ -25,6 +25,11 @@ const DICTS: Record<Lang, Dict> = {
     logout: "Logout",
 
     // Chat & sidebar
+    feed: "Feed",
+    saved: "Saved",
+    contentStorage: "Content Storage",
+    home: "Home",
+    aiChat: "AI Chat",
     history: "History",
     heroTitle: "What do you want to see?",
     you_asked: "You asked:",
@@ -90,7 +95,7 @@ const DICTS: Record<Lang, Dict> = {
     dobFuture: "Date of birth cannot be in the future.",
     ageDobMismatch: "Age does not match date of birth.",
     noChanges: "No changes to save.",
-    saved: "Saved.",
+    savedSuccess: "Saved.",
 
     // DateField
     invalidDateLead: "Please enter a valid date in",
@@ -146,6 +151,21 @@ const DICTS: Record<Lang, Dict> = {
     // Disclaimer
     chatDisclaimer: "ChatGOV can make mistakes. Check important info.",
 
+    // Content Storage
+    contentStorageTitle: "Content Storage",
+    contentStorageSubtitle: "AI-powered content saved for knowledge graph",
+    savedItems: "items",
+    noSavedContent: "No saved content yet",
+    noSavedDesc: "Save posts from your newsfeed to build your knowledge graph",
+    platform: "Platform",
+    author: "Author",
+    content: "Content",
+    engagement: "Engagement",
+    savedTime: "Saved",
+    actions: "Actions",
+    remove: "Remove",
+    hasMedia: "Has media",
+
     checkInbox: "Check your inbox",
     verifySentDesc: "We sent a verification email to",
     resetSentDesc: "We sent a password reset link to",
@@ -177,6 +197,11 @@ const DICTS: Record<Lang, Dict> = {
     logout: "Đăng xuất",
 
     // Chat & sidebar
+    feed: "Bảng tin",
+    saved: "Đã lưu",
+    contentStorage: "Kho nội dung",
+    home: "Trang chủ",
+    aiChat: "Chat AI",
     history: "Lịch sử",
     heroTitle: "Bạn đang muốn xem gì?",
     you_asked: "Bạn vừa hỏi:",
@@ -241,7 +266,7 @@ const DICTS: Record<Lang, Dict> = {
     dobFuture: "Ngày sinh không được lớn hơn hiện tại.",
     ageDobMismatch: "Tuổi không khớp với ngày sinh.",
     noChanges: "Không có thay đổi nào.",
-    saved: "Đã lưu.",
+    savedSuccess: "Đã lưu.",
 
     // DateField
     invalidDateLead: "Vui lòng nhập ngày theo định dạng",
@@ -296,6 +321,21 @@ const DICTS: Record<Lang, Dict> = {
 
     // Disclaimer
     chatDisclaimer: "ChatGOV có thể sai sót. Hãy kiểm tra thông tin quan trọng.",
+
+    // Content Storage
+    contentStorageTitle: "Kho nội dung",
+    contentStorageSubtitle: "Nội dung được lưu cho đồ thị tri thức AI",
+    savedItems: "mục",
+    noSavedContent: "Chưa có nội dung đã lưu",
+    noSavedDesc: "Lưu bài viết từ bảng tin để xây dựng đồ thị tri thức của bạn",
+    platform: "Nền tảng",
+    author: "Tác giả",
+    content: "Nội dung",
+    engagement: "Tương tác",
+    savedTime: "Đã lưu",
+    actions: "Hành động",
+    remove: "Xóa",
+    hasMedia: "Có hình ảnh",
 
     checkInbox: "Hãy kiểm tra hộp thư",
     verifySentDesc: "Chúng tôi đã gửi email xác minh tới",
