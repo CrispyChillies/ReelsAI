@@ -1,7 +1,7 @@
 """
-Video Summarization to Knowledge Graph processor.
+Text to Knowledge Graph processor.
 
-This module handles the complete pipeline from video summarization JSON
+This module handles the complete pipeline from text JSON
 to Neo4j knowledge graph storage.
 """
 
@@ -18,9 +18,9 @@ from .neo4j_client import Neo4jClient
 logger = logging.getLogger(__name__)
 
 
-class VideoSummarizationProcessor:
+class TextProcessor:
     """
-    Processes video summarization data and converts it to a Neo4j knowledge graph
+    Processes text data and converts it to a Neo4j knowledge graph
     with automatic duplicate resolution.
     """
     
@@ -47,19 +47,19 @@ class VideoSummarizationProcessor:
         # Ensure indexes are created
         self.neo4j_client.create_indexes()
         
-        logger.info(f"VideoSummarizationProcessor initialized with resolution: {enable_resolution}")
+        logger.info(f"TextProcessor initialized with resolution: {enable_resolution}")
     
     def validate_payload(self, payload: Dict[str, Any]) -> bool:
         """
-        Validate the incoming video summarization payload.
+        Validate the incoming text payload.
         
         Args:
-            payload: The video summarization payload
+            payload: The text payload
             
         Returns:
             True if valid, False otherwise
         """
-        required_fields = ['user', 'video', 'topic', 'source', 'summarization']
+        required_fields = ['user', 'post', 'topic', 'source', 'text']
         
         for field in required_fields:
             if field not in payload:
@@ -72,26 +72,26 @@ class VideoSummarizationProcessor:
             logger.error("User must have user_id")
             return False
         
-        # Validate video data
-        video = payload.get('video', {})
-        if not video.get('video_id'):
-            logger.error("Video must have video_id")
+        # Validate post data
+        post = payload.get('post', {})
+        if not post.get('post_id'):
+            logger.error("Post must have post_id")
             return False
         
-        # Validate summarization text
-        if not payload.get('summarization', '').strip():
-            logger.error("Summarization text cannot be empty")
+        # Validate text
+        if not payload.get('text', '').strip():
+            logger.error("Text cannot be empty")
             return False
         
         return True
     
-    def extract_knowledge_graph(self, topic: str, summarization: str) -> Dict[str, Any]:
+    def extract_knowledge_graph(self, topic: str, text: str) -> Dict[str, Any]:
         """
-        Extract knowledge graph from summarization text.
+        Extract knowledge graph from text.
         
         Args:
             topic: The main topic/subject
-            summarization: The summarization text
+            text: The text to extract knowledge from
             
         Returns:
             Knowledge graph result from pipeline
@@ -99,7 +99,7 @@ class VideoSummarizationProcessor:
         try:
             result = run_knowledge_graph_pipeline(
                 topic=topic,
-                raw_text=summarization,
+                raw_text=text,
                 llm=self.llm
             )
             
@@ -120,10 +120,10 @@ class VideoSummarizationProcessor:
     
     def upsert_metadata_nodes(self, payload: Dict[str, Any]) -> Dict[str, str]:
         """
-        Upsert metadata nodes (User, Video, Topic, Source) to Neo4j.
+        Upsert metadata nodes (User, Post, Topic, Source) to Neo4j.
         
         Args:
-            payload: The video summarization payload
+            payload: The text payload
             
         Returns:
             Dictionary mapping node types to their IDs
@@ -140,16 +140,16 @@ class VideoSummarizationProcessor:
             node_ids['user'] = self.neo4j_client.upsert_user(user_data)
             logger.info(f"Upserted user: {node_ids['user']}")
             
-            # Upsert Video node
-            video_data = payload['video'].copy()
-            video_data.setdefault('title', f"Video_{video_data['video_id']}")
-            video_data.setdefault('description', '')
-            video_data.setdefault('duration', 0)
-            video_data.setdefault('upload_date', datetime.now().isoformat())
-            video_data.setdefault('url', '')
+            # Upsert Post node
+            post_data = payload['post'].copy()
+            post_data.setdefault('title', f"Post_{post_data['post_id']}")
+            post_data.setdefault('description', '')
+            post_data.setdefault('duration', 0)
+            post_data.setdefault('upload_date', datetime.now().isoformat())
+            post_data.setdefault('url', '')
             
-            node_ids['video'] = self.neo4j_client.upsert_video(video_data)
-            logger.info(f"Upserted video: {node_ids['video']}")
+            node_ids['post'] = self.neo4j_client.upsert_post(post_data)
+            logger.info(f"Upserted post: {node_ids['post']}")
             
             # Upsert Topic node
             topic_data = payload['topic'].copy()
@@ -222,23 +222,23 @@ class VideoSummarizationProcessor:
             node_ids: Dictionary mapping node types to their IDs
         """
         try:
-            # User CARES Video
-            self.neo4j_client.create_user_cares_video_relationship(
+            # User CARES post
+            self.neo4j_client.create_user_cares_post_relationship(
                 node_ids['user'], 
-                node_ids['video'],
+                node_ids['post'],
                 {'relationship_type': 'engagement', 'weight': 1.0}
             )
             
-            # Video ABOUT Topic
-            self.neo4j_client.create_video_about_topic_relationship(
-                node_ids['video'], 
+            # Post ABOUT Topic
+            self.neo4j_client.create_post_about_topic_relationship(
+                node_ids['post'], 
                 node_ids['topic'],
                 {'relevance_score': 1.0}
             )
             
-            # Video FROM Source
-            self.neo4j_client.create_video_from_source_relationship(
-                node_ids['video'], 
+            # Post FROM Source
+            self.neo4j_client.create_post_from_source_relationship(
+                node_ids['post'], 
                 node_ids['source'],
                 {'original_source': True}
             )
@@ -249,25 +249,25 @@ class VideoSummarizationProcessor:
             logger.error(f"Failed to create metadata relationships: {e}")
             raise
     
-    def create_entity_relationships(self, video_id: str, entities: List[Dict[str, str]], 
+    def create_entity_relationships(self, post_id: str, entities: List[Dict[str, str]], 
                                    relations: List[tuple]):
         """
-        Create relationships between video and entities, and between entities.
+        Create relationships between post and entities, and between entities.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             entities: List of extracted entities
             relations: List of relationships between entities (as tuples or dicts)
         """
         try:
-            # Create Video MENTIONS Entity relationships
+            # Create Post MENTIONS Entity relationships
             for entity in entities:
-                self.neo4j_client.create_video_mentions_entity_relationship(
-                    video_id,
+                self.neo4j_client.create_post_mentions_entity_relationship(
+                    post_id,
                     entity['name'],
                     {'entity_type': entity['type'], 'extraction_confidence': 1.0}
                 )
-                print(f"Linked video {video_id} to entity {entity['name']}")
+                print(f"Linked post {post_id} to entity {entity['name']}")
             
             # Create relationships between entities
             entity_relations = []
@@ -282,7 +282,7 @@ class VideoSummarizationProcessor:
                     entity_relations.append(relation)
             
             if entity_relations:
-                self.neo4j_client.create_entity_relationships(entity_relations, video_id)
+                self.neo4j_client.create_entity_relationships(entity_relations, post_id)
             
             logger.info(f"Created {len(entities)} entity mentions and "
                        f"{len(entity_relations)} inter-entity relationships")
@@ -291,12 +291,12 @@ class VideoSummarizationProcessor:
             logger.error(f"Failed to create entity relationships: {e}")
             raise
     
-    def _handle_existing_video_new_user(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
+    def _handle_existing_post_new_user(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
         """
-        Handle case where video exists but user is new.
+        Handle case where post exists but user is new.
         
         Args:
-            payload: Video summarization payload
+            payload: Text payload
             start_time: Processing start time
             
         Returns:
@@ -304,7 +304,7 @@ class VideoSummarizationProcessor:
         """
         try:
             user_id = payload['user']['user_id']
-            video_id = payload['video']['video_id']
+            post_id = payload['post']['post_id']
             
             # Upsert user node
             user_data = payload['user'].copy()
@@ -315,15 +315,15 @@ class VideoSummarizationProcessor:
             user_node_id = self.neo4j_client.upsert_user(user_data)
             logger.info(f"Upserted user: {user_node_id}")
             
-            # Create user-video relationship
-            self.neo4j_client.create_user_cares_video_relationship(
+            # Create user-post relationship
+            self.neo4j_client.create_user_cares_post_relationship(
                 user_id,
-                video_id,
-                {'relationship_type': 'engagement', 'weight': 1.0, 'created_via': 'existing_video'}
+                post_id,
+                {'relationship_type': 'engagement', 'weight': 1.0, 'created_via': 'existing_post'}
             )
             
-            # Get video details for response
-            video_details = self.neo4j_client.get_video_details(video_id)
+            # Get post details for response
+            post_details = self.neo4j_client.get_post_details(post_id)
             
             processing_time = (datetime.now() - start_time).total_seconds()
             
@@ -332,29 +332,29 @@ class VideoSummarizationProcessor:
             
             return {
                 'status': 'success',
-                'processing_type': 'existing_video_new_user',
-                'message': 'Connected user to existing video',
+                'processing_type': 'existing_post_new_user',
+                'message': 'Connected user to existing post',
                 'processing_time_seconds': processing_time,
                 'user_id': user_id,
-                'video_id': video_id,
-                'video_details': video_details,
+                'post_id': post_id,
+                'post_details': post_details,
                 # Standardized fields for consistency
-                'extracted_entities': 0,  # No new extraction for existing videos
+                'extracted_entities': 0,  # No new extraction for existing posts
                 'extracted_relations': 0,
                 'upserted_entities': 0,
-                'node_ids': {'user': user_id, 'video': video_id},
+                'node_ids': {'user': user_id, 'post': post_id},
                 'graph_statistics': graph_stats,
                 'kg_validation': {},
                 'resolution_enabled': self.enable_resolution,
-                'entities_count': len(video_details.get('entities', [])) if video_details else 0
+                'entities_count': len(post_details.get('entities', [])) if post_details else 0
             }
             
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"Failed to handle existing video for new user: {e}")
+            logger.error(f"Failed to handle existing post for new user: {e}")
             return {
                 'status': 'error',
-                'processing_type': 'existing_video_new_user_failed',
+                'processing_type': 'existing_post_new_user_failed',
                 'error_message': str(e),
                 'processing_time_seconds': processing_time,
                 # Standardized error fields
@@ -367,12 +367,12 @@ class VideoSummarizationProcessor:
                 'resolution_enabled': self.enable_resolution
             }
     
-    def _handle_new_video(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
+    def _handle_new_post(self, payload: Dict[str, Any], start_time: datetime) -> Dict[str, Any]:
         """
-        Handle case where video is completely new.
+        Handle case where post is completely new.
         
         Args:
-            payload: Video summarization payload
+            payload: Text payload
             start_time: Processing start time
             
         Returns:
@@ -380,11 +380,11 @@ class VideoSummarizationProcessor:
         """
         try:
             topic_name = payload['topic']['name'] if isinstance(payload['topic'], dict) else payload['topic']
-            summarization = payload['summarization']
+            text = payload['text']
             
             # Original full pipeline processing
-            # Step 1: Extract knowledge graph from summarization
-            kg_result = self.extract_knowledge_graph(topic_name, summarization)
+            # Step 1: Extract knowledge graph from text
+            kg_result = self.extract_knowledge_graph(topic_name, text)
             
             # Step 2: Upsert metadata nodes
             node_ids = self.upsert_metadata_nodes(payload)
@@ -418,7 +418,7 @@ class VideoSummarizationProcessor:
                 
                 # Use advanced upsert with graph resolution
                 resolution_stats = self.neo4j_client.upsert_knowledge_graph_with_resolution(
-                    video_id=node_ids['video'],
+                    post_id=node_ids['post'],
                     entities=normalized_entities,
                     relationships=relationship_dicts,
                     enable_resolution=True
@@ -438,7 +438,7 @@ class VideoSummarizationProcessor:
             # Step 5: Create entity relationships (if not using resolution)
             if not self.enable_resolution:
                 self.create_entity_relationships(
-                    node_ids['video'], 
+                    node_ids['post'], 
                     kg_result['entities'], 
                     kg_result['resolved_relations']
                 )
@@ -451,7 +451,7 @@ class VideoSummarizationProcessor:
             
             result = {
                 'status': 'success',
-                'processing_type': 'new_video_full_pipeline',
+                'processing_type': 'new_post_full_pipeline',
                 'processing_time_seconds': processing_time,
                 'extracted_entities': len(kg_result['entities']),
                 'extracted_relations': len(kg_result['resolved_relations']),
@@ -468,14 +468,14 @@ class VideoSummarizationProcessor:
                 if 'entity_mappings' in resolution_stats:
                     result['resolved_entities_count'] = len(resolution_stats['entity_mappings'])
             
-            logger.info(f"Successfully processed new video in {processing_time:.2f}s ")
+            logger.info(f"Successfully processed new post in {processing_time:.2f}s ")
             return result
             
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             error_result = {
                 'status': 'error',
-                'processing_type': 'new_video_pipeline_failed',
+                'processing_type': 'new_post_pipeline_failed',
                 'error_message': str(e),
                 'processing_time_seconds': processing_time,
                 # Standardized error fields
@@ -487,15 +487,15 @@ class VideoSummarizationProcessor:
                 'kg_validation': {},
                 'resolution_enabled': self.enable_resolution
             }
-            logger.error(f"Failed to process new video: {e}")
+            logger.error(f"Failed to process new post: {e}")
             return error_result
         
-    def process_video_summarization(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def process_text(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Complete pipeline to process video summarization and create knowledge graph.
+        Complete pipeline to process text and create knowledge graph.
         
         Args:
-            payload: Video summarization payload
+            payload: Text payload
             
         Returns:
             Processing result with statistics and status
@@ -509,16 +509,16 @@ class VideoSummarizationProcessor:
             
             # Extract basic info
             user_id = payload['user']['user_id']
-            video_id = payload['video']['video_id']
+            post_id = payload['post']['post_id']
             topic_name = payload['topic']['name'] if isinstance(payload['topic'], dict) else payload['topic']
-            summarization = payload['summarization']
+            text = payload['text']
             
-            logger.info(f"Processing video summarization for user: {user_id}, video: {video_id}")
+            logger.info(f"Processing text for user: {user_id}, post: {post_id}")
             
-            # Case 1: Check if user already has this video
-            if self.neo4j_client.check_user_video_relationship(user_id, video_id):
+            # Case 1: Check if user already has this post
+            if self.neo4j_client.check_user_post_relationship(user_id, post_id):
                 processing_time = (datetime.now() - start_time).total_seconds()
-                logger.info(f"User {user_id} already has relationship with video {video_id} - skipping processing")
+                logger.info(f"User {user_id} already has relationship with post {post_id} - skipping processing")
                 
                 # Get graph statistics for consistency
                 graph_stats = self.neo4j_client.get_graph_stats()
@@ -526,29 +526,29 @@ class VideoSummarizationProcessor:
                 return {
                     'status': 'success',
                     'processing_type': 'skipped_existing_relationship',
-                    'message': 'User already has this video saved',
+                    'message': 'User already has this post saved',
                     'processing_time_seconds': processing_time,
                     'user_id': user_id,
-                    'video_id': video_id,
+                    'post_id': post_id,
                     # Standardized fields for consistency
                     'extracted_entities': 0,  # No processing for existing relationships
                     'extracted_relations': 0,
                     'upserted_entities': 0,
-                    'node_ids': {'user': user_id, 'video': video_id},
+                    'node_ids': {'user': user_id, 'post': post_id},
                     'graph_statistics': graph_stats,
                     'kg_validation': {},
                     'resolution_enabled': self.enable_resolution
                 }
             
-            # Case 2: Check if video exists but user doesn't have it
-            video_exists = self.neo4j_client.check_video_exists(video_id)
+            # Case 2: Check if post exists but user doesn't have it
+            post_exists = self.neo4j_client.check_post_exists(post_id)
             
-            if video_exists:
-                logger.info(f"Video {video_id} exists - creating user relationship only")
-                return self._handle_existing_video_new_user(payload, start_time)
+            if post_exists:
+                logger.info(f"Post {post_id} exists - creating user relationship only")
+                return self._handle_existing_post_new_user(payload, start_time)
             else:
-                logger.info(f"New video {video_id} - processing full pipeline")
-                return self._handle_new_video(payload, start_time)
+                logger.info(f"New post {post_id} - processing full pipeline")
+                return self._handle_new_post(payload, start_time)
                 
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -566,16 +566,16 @@ class VideoSummarizationProcessor:
                 'kg_validation': {},
                 'resolution_enabled': self.enable_resolution
             }
-            logger.error(f"Failed to process video summarization: {e}")
+            logger.error(f"Failed to process text: {e}")
             return error_result
 
 
-def process_video_summarization_json(json_payload: str) -> Dict[str, Any]:
+def process_text_json(json_payload: str) -> Dict[str, Any]:
     """
-    Convenience function to process video summarization from JSON string.
+    Convenience function to process text from JSON string.
     
     Args:
-        json_payload: JSON string containing video summarization data
+        json_payload: JSON string containing text data
         
     Returns:
         Processing result
@@ -588,22 +588,22 @@ def process_video_summarization_json(json_payload: str) -> Dict[str, Any]:
             'error_message': f"Invalid JSON: {e}"
         }
     
-    processor = VideoSummarizationProcessor()
-    return processor.process_video_summarization(payload)
+    processor = TextProcessor()
+    return processor.process_text(payload)
 
 
-def process_video_summarization_dict(payload: Dict[str, Any]) -> Dict[str, Any]:
+def process_text_dict(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convenience function to process video summarization from dictionary.
+    Convenience function to process text from dictionary.
     
     Args:
-        payload: Dictionary containing video summarization data
+        payload: Dictionary containing text data
         
     Returns:
         Processing result
     """
-    processor = VideoSummarizationProcessor()
-    return processor.process_video_summarization(payload)
+    processor = TextProcessor()
+    return processor.process_text(payload)
 
 
 # Example payload structure for reference
@@ -613,13 +613,13 @@ EXAMPLE_PAYLOAD = {
         "name": "John Doe",
         "email": "john@example.com"
     },
-    "video": {
-        "video_id": "video_456",
+    "post": {
+        "post_id": "post_456",
         "title": "Introduction to Machine Learning",
         "description": "A comprehensive guide to ML basics",
         "duration": 1800,  # seconds
         "upload_date": "2025-11-10T10:00:00Z",
-        "url": "https://example.com/video/456"
+        "url": "https://example.com/post/456"
     },
     "topic": {
         "name": "Machine Learning",
@@ -632,7 +632,7 @@ EXAMPLE_PAYLOAD = {
         "url": "https://teched.example.com",
         "description": "Online learning platform for technology courses"
     },
-    "summarization": """
+    "text": """
     Machine Learning is a subset of Artificial Intelligence that enables computers to learn 
     without being explicitly programmed. The video covers fundamental concepts including 
     supervised learning, unsupervised learning, and reinforcement learning. Popular algorithms 

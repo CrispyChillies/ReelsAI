@@ -2,7 +2,7 @@
 Graph Resolution System for Knowledge Graph Merging
 
 This module provides functionality to resolve duplicates and conflicts when merging
-new video knowledge graphs with the existing global knowledge graph.
+new post knowledge graphs with the existing global knowledge graph.
 """
 
 import logging
@@ -101,7 +101,7 @@ class GraphResolutionEngine:
         Use LLM to resolve entity duplicates between new and existing entities.
         
         Args:
-            new_entities: Entities from new video
+            new_entities: Entities from new post
             existing_entities: Entities already in graph
             
         Returns:
@@ -147,7 +147,7 @@ class GraphResolutionEngine:
         Use LLM to resolve relationship conflicts and duplicates.
         
         Args:
-            new_relationships: Relationships from new video
+            new_relationships: Relationships from new post
             existing_relationships: Relationships already in graph
             entity_mappings: How new entities map to existing entities
             
@@ -196,13 +196,13 @@ class GraphResolutionEngine:
             return {"duplicates": [], "conflicts": [], "updates": []}
     
     def apply_entity_resolutions(self, resolutions: List[Dict[str, Any]], 
-                                video_id: str) -> Dict[str, str]:
+                                post_id: str) -> Dict[str, str]:
         """
         Apply entity resolution decisions to the graph.
         
         Args:
             resolutions: List of entity resolution decisions
-            video_id: ID of the video being processed
+            post_id: ID of the post being processed
             
         Returns:
             Mapping of new entity names to canonical names
@@ -222,10 +222,10 @@ class GraphResolutionEngine:
                 query = """
                 MATCH (e:Entity {name: $existing_entity})
                 SET e.updated_at = datetime(),
-                    e.last_seen_video = $video_id,
+                    e.last_seen_post = $post_id,
                     e.resolution_count = COALESCE(e.resolution_count, 0) + 1
                 WITH e
-                MATCH (v:Video {video_id: $video_id})
+                MATCH (v:Post {post_id: $post_id})
                 MERGE (v)-[r:MENTIONS]->(e)
                 SET r.resolution_applied = true,
                     r.original_name = $new_entity,
@@ -237,7 +237,7 @@ class GraphResolutionEngine:
                 with self.driver.session() as session:
                     session.run(query,
                                existing_entity=existing_entity,
-                               video_id=video_id,
+                               post_id=post_id,
                                new_entity=new_entity,
                                confidence=confidence,
                                reason=reason)
@@ -247,13 +247,13 @@ class GraphResolutionEngine:
         return entity_mappings
     
     def apply_relationship_resolutions(self, resolution_result: Dict[str, Any], 
-                                     video_id: str, entity_mappings: Dict[str, str]):
+                                     post_id: str, entity_mappings: Dict[str, str]):
         """
         Apply relationship resolution decisions to the graph.
         
         Args:
             resolution_result: LLM resolution result
-            video_id: ID of the video being processed
+            post_id: ID of the post being processed
             entity_mappings: Entity name mappings
         """
         # Handle duplicate relationships - merge them
@@ -266,7 +266,7 @@ class GraphResolutionEngine:
             MATCH (e1:Entity {name: $subject})-[r]->(e2:Entity {name: $object})
             WHERE type(r) = $relation
             SET r.mention_count = COALESCE(r.mention_count, 1) + 1,
-                r.last_mentioned_video = $video_id,
+                r.last_mentioned_post = $post_id,
                 r.updated_at = datetime()
             RETURN r
             """
@@ -276,13 +276,13 @@ class GraphResolutionEngine:
                            subject=existing_rel[0],
                            relation=existing_rel[1],
                            object=existing_rel[2],
-                           video_id=video_id)
+                           post_id=post_id)
         
         # Handle conflicts - flag for manual review
         for conflict in resolution_result.get('conflicts', []):
             query = """
             CREATE (c:ConflictFlag {
-                video_id: $video_id,
+                post_id: $post_id,
                 new_relationship: $new_rel,
                 existing_relationship: $existing_rel,
                 reason: $reason,
@@ -294,7 +294,7 @@ class GraphResolutionEngine:
             
             with self.driver.session() as session:
                 session.run(query,
-                           video_id=video_id,
+                           post_id=post_id,
                            new_rel=str(conflict['new_relationship']),
                            existing_rel=str(conflict['existing_relationship']),
                            reason=conflict['reason'])
@@ -308,20 +308,20 @@ class GraphResolutionEngine:
             # Implementation would depend on specific requirements
             logger.info(f"Relationship update suggested: {original_rel} -> {updated_rel}")
     
-    def resolve_and_merge_video_graph(self, video_id: str, new_entities: List[Dict[str, str]], 
+    def resolve_and_merge_post_graph(self, post_id: str, new_entities: List[Dict[str, str]], 
                                      new_relationships: List[Tuple[str, str, str]]) -> Dict[str, Any]:
         """
-        Complete resolution and merging of a new video graph with the global graph.
+        Complete resolution and merging of a new post graph with the global graph.
         
         Args:
-            video_id: Video identifier
-            new_entities: Entities extracted from the video
-            new_relationships: Relationships extracted from the video
+            post_id: Post identifier
+            new_entities: Entities extracted from the post
+            new_relationships: Relationships extracted from the post
             
         Returns:
             Resolution statistics and mappings
         """
-        logger.info(f"Starting graph resolution for video {video_id}")
+        logger.info(f"Starting graph resolution for post {post_id}")
         
         # Get relevant existing entities (same types as new entities)
         new_entity_types = list(set(e['type'] for e in new_entities))
@@ -331,7 +331,7 @@ class GraphResolutionEngine:
         entity_resolution = self.resolve_entities_with_llm(new_entities, existing_entities)
         entity_mappings = self.apply_entity_resolutions(
             entity_resolution.get('resolutions', []), 
-            video_id
+            post_id
         )
         
         # Get relevant existing relationships
@@ -346,11 +346,11 @@ class GraphResolutionEngine:
         relationship_resolution = self.resolve_relationships_with_llm(
             new_relationships, existing_rel_tuples, entity_mappings
         )
-        self.apply_relationship_resolutions(relationship_resolution, video_id, entity_mappings)
+        self.apply_relationship_resolutions(relationship_resolution, post_id, entity_mappings)
         
         # Calculate statistics
         resolution_stats = {
-            'video_id': video_id,
+            'post_id': post_id,
             'new_entities_count': len(new_entities),
             'existing_entities_count': len(existing_entities),
             'entity_resolutions_count': len(entity_resolution.get('resolutions', [])),
@@ -361,7 +361,7 @@ class GraphResolutionEngine:
             'relationship_updates': len(relationship_resolution.get('updates', []))
         }
         
-        logger.info(f"Graph resolution completed for video {video_id}: "
+        logger.info(f"Graph resolution completed for post {post_id}: "
                    f"{len(entity_mappings)} entities resolved, "
                    f"{len(relationship_resolution.get('duplicates', []))} relationships merged")
         
@@ -378,7 +378,7 @@ def create_graph_resolution_indexes(driver: Driver):
     indexes = [
         "CREATE INDEX entity_type_name_index IF NOT EXISTS FOR (e:Entity) ON (e.type, e.name)",
         "CREATE INDEX entity_resolution_index IF NOT EXISTS FOR (e:Entity) ON (e.resolution_count)",
-        "CREATE INDEX video_mentions_index IF NOT EXISTS FOR ()-[r:MENTIONS]-() ON (r.resolution_applied)",
+        "CREATE INDEX post_mentions_index IF NOT EXISTS FOR ()-[r:MENTIONS]-() ON (r.resolution_applied)",
         "CREATE INDEX conflict_flag_index IF NOT EXISTS FOR (c:ConflictFlag) ON (c.status, c.created_at)"
     ]
     
@@ -391,19 +391,19 @@ def create_graph_resolution_indexes(driver: Driver):
                 logger.warning(f"Index creation failed (may already exist): {e}")
 
 
-def get_resolution_statistics(driver: Driver, video_id: str = None) -> Dict[str, Any]:
+def get_resolution_statistics(driver: Driver, post_id: str = None) -> Dict[str, Any]:
     """
     Get statistics about graph resolution performance.
     
     Args:
         driver: Neo4j database driver
-        video_id: Optional specific video ID
+        post_id: Optional specific post ID
         
     Returns:
         Dictionary containing resolution statistics
     """
-    video_filter = "WHERE c.video_id = $video_id" if video_id else ""
-    params = {"video_id": video_id} if video_id else {}
+    post_filter = "WHERE c.post_id = $post_id" if post_id else ""
+    params = {"post_id": post_id} if post_id else {}
     
     queries = {
         "total_resolutions": f"""
@@ -413,13 +413,13 @@ def get_resolution_statistics(driver: Driver, video_id: str = None) -> Dict[str,
         """,
         "total_conflicts": f"""
             MATCH (c:ConflictFlag)
-            {video_filter}
+            {post_filter}
             RETURN count(c) as count
         """,
         "pending_conflicts": f"""
             MATCH (c:ConflictFlag)
             WHERE c.status = 'pending_review'
-            {video_filter and "AND " + video_filter.replace("WHERE", "")}
+            {post_filter and "AND " + post_filter.replace("WHERE", "")}
             RETURN count(c) as count
         """,
         "resolved_mentions": f"""

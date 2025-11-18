@@ -2,7 +2,7 @@
 Neo4j client for Knowledge Graph integration.
 
 This module provides functionality to connect to Neo4j and upsert knowledge graphs
-from video summarization data with graph resolution capabilities.
+from text data with graph resolution capabilities.
 """
 
 import logging
@@ -98,7 +98,7 @@ class Neo4jClient:
         """Create necessary indexes for better performance."""
         indexes = [
             "CREATE INDEX user_id_index IF NOT EXISTS FOR (u:User) ON (u.user_id)",
-            "CREATE INDEX video_id_index IF NOT EXISTS FOR (v:Video) ON (v.video_id)",
+            "CREATE INDEX post_id_index IF NOT EXISTS FOR (v:Post) ON (v.post_id)",
             "CREATE INDEX topic_name_index IF NOT EXISTS FOR (t:Topic) ON (t.name)",
             "CREATE INDEX source_name_index IF NOT EXISTS FOR (s:Source) ON (s.name)",
             "CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)",
@@ -138,30 +138,30 @@ class Neo4jClient:
             result = session.run(query, **user_data)
             return result.single()["user_id"]
     
-    def upsert_video(self, video_data: Dict[str, Any]) -> str:
+    def upsert_post(self, post_data: Dict[str, Any]) -> str:
         """
-        Upsert a Video node.
+        Upsert a Post node.
         
         Args:
-            video_data: Dictionary containing video information
+            post_data: Dictionary containing post information
             
         Returns:
-            Video ID
+            Post ID
         """
         query = """
-        MERGE (v:Video {video_id: $video_id})
+        MERGE (v:Post {post_id: $post_id})
         SET v.title = $title,
             v.description = $description,
             v.duration = $duration,
             v.upload_date = $upload_date,
             v.url = $url,
             v.updated_at = datetime()
-        RETURN v.video_id as video_id
+        RETURN v.post_id as post_id
         """
         
         with self._driver.session() as session:
-            result = session.run(query, **video_data)
-            return result.single()["video_id"]
+            result = session.run(query, **post_data)
+            return result.single()["post_id"]
     
     def upsert_topic(self, topic_data: Dict[str, Any]) -> str:
         """
@@ -208,13 +208,13 @@ class Neo4jClient:
             result = session.run(query, **source_data)
             return result.single()["name"]
     
-    def upsert_entity(self, entity_data: Dict[str, Any], video_id: str = None) -> str:
+    def upsert_entity(self, entity_data: Dict[str, Any], post_id: str = None) -> str:
         """
         Upsert an Entity node.
         
         Args:
             entity_data: Dictionary containing entity information
-            video_id: Optional video ID for tracking entity source
+            post_id: Optional post ID for tracking entity source
             
         Returns:
             Entity name
@@ -233,26 +233,26 @@ class Neo4jClient:
             result = session.run(query, **entity_data)
             entity_name = result.single()["name"]
             
-            # Then create the MENTIONS relationship if video_id is provided
-            if video_id:
+            # Then create the MENTIONS relationship if post_id is provided
+            if post_id:
                 mention_query = """
-                MATCH (v:Video {video_id: $video_id})
+                MATCH (v:Post {post_id: $post_id})
                 MATCH (e:Entity {name: $entity_name})
                 MERGE (v)-[r:MENTIONS]->(e)
                 SET r.created_at = COALESCE(r.created_at, datetime())
                 RETURN r
                 """
-                session.run(mention_query, video_id=video_id, entity_name=entity_name)
+                session.run(mention_query, post_id=post_id, entity_name=entity_name)
             
             return entity_name
         
-    def upsert_relationship(self, relationship_data: Dict[str, Any], video_id: str = None):
+    def upsert_relationship(self, relationship_data: Dict[str, Any], post_id: str = None):
         """
         Upsert a relationship between two entities.
         
         Args:
             relationship_data: Dictionary containing 'subject', 'relation', 'object'
-            video_id: Optional video ID for tracking relationship source
+            post_id: Optional post ID for tracking relationship source
         """
         query = """
         MATCH (e1:Entity {name: $subject})
@@ -260,7 +260,7 @@ class Neo4jClient:
         CALL apoc.create.relationship(e1, $relation_type, {
             created_at: datetime(),
             source: 'kg_extraction',
-            video_id: $video_id
+            post_id: $post_id
         }, e2) YIELD rel
         RETURN rel
         """
@@ -271,7 +271,7 @@ class Neo4jClient:
                            subject=relationship_data['subject'],
                            object=relationship_data['object'],
                            relation_type=relationship_data['relation'].upper(),
-                           video_id=video_id)
+                           post_id=post_id)
             except Exception as e:
                 # Fallback to creating a generic RELATED relationship if APOC is not available
                 fallback_query = """
@@ -281,28 +281,28 @@ class Neo4jClient:
                 SET r.relation_type = $relation_type,
                     r.created_at = datetime(),
                     r.source = 'kg_extraction',
-                    r.video_id = $video_id
+                    r.post_id = $post_id
                 RETURN r
                 """
                 session.run(fallback_query,
                            subject=relationship_data['subject'],
                            object=relationship_data['object'],
                            relation_type=relationship_data['relation'],
-                           video_id=video_id)
+                           post_id=post_id)
     
-    def create_user_cares_video_relationship(self, user_id: str, video_id: str, 
+    def create_user_cares_post_relationship(self, user_id: str, post_id: str, 
                                            properties: Dict[str, Any] = None):
         """
-        Create CARES relationship between User and Video.
+        Create CARES relationship between User and Post.
         
         Args:
             user_id: User identifier
-            video_id: Video identifier
+            post_id: Post identifier
             properties: Optional relationship properties
         """
         query = """
         MATCH (u:User {user_id: $user_id})
-        MATCH (v:Video {video_id: $video_id})
+        MATCH (v:Post {post_id: $post_id})
         MERGE (u)-[r:CARES]->(v)
         SET r.created_at = datetime(),
             r += $properties
@@ -312,21 +312,21 @@ class Neo4jClient:
         with self._driver.session() as session:
             session.run(query, 
                        user_id=user_id, 
-                       video_id=video_id, 
+                       post_id=post_id, 
                        properties=properties or {})
     
-    def create_video_about_topic_relationship(self, video_id: str, topic_name: str,
+    def create_post_about_topic_relationship(self, post_id: str, topic_name: str,
                                             properties: Dict[str, Any] = None):
         """
-        Create ABOUT relationship between Video and Topic.
+        Create ABOUT relationship between Post and Topic.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             topic_name: Topic name
             properties: Optional relationship properties
         """
         query = """
-        MATCH (v:Video {video_id: $video_id})
+        MATCH (v:Post {post_id: $post_id})
         MATCH (t:Topic {name: $topic_name})
         MERGE (v)-[r:ABOUT]->(t)
         SET r.created_at = datetime(),
@@ -336,22 +336,22 @@ class Neo4jClient:
         
         with self._driver.session() as session:
             session.run(query,
-                       video_id=video_id,
+                       post_id=post_id,
                        topic_name=topic_name,
                        properties=properties or {})
     
-    def create_video_mentions_entity_relationship(self, video_id: str, entity_name: str,
+    def create_post_mentions_entity_relationship(self, post_id: str, entity_name: str,
                                                 properties: Dict[str, Any] = None):
         """
-        Create MENTIONS relationship between Video and Entity.
+        Create MENTIONS relationship between Post and Entity.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             entity_name: Entity name
             properties: Optional relationship properties
         """
         query = """
-        MATCH (v:Video {video_id: $video_id})
+        MATCH (v:Post {post_id: $post_id})
         MATCH (e:Entity {name: $entity_name})
         MERGE (v)-[r:MENTIONS]->(e)
         SET r.created_at = datetime(),
@@ -361,22 +361,22 @@ class Neo4jClient:
         
         with self._driver.session() as session:
             session.run(query,
-                       video_id=video_id,
+                       post_id=post_id,
                        entity_name=entity_name,
                        properties=properties or {})
     
-    def create_video_from_source_relationship(self, video_id: str, source_name: str,
+    def create_post_from_source_relationship(self, post_id: str, source_name: str,
                                             properties: Dict[str, Any] = None):
         """
-        Create FROM relationship between Video and Source.
+        Create FROM relationship between Post and Source.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             source_name: Source name
             properties: Optional relationship properties
         """
         query = """
-        MATCH (v:Video {video_id: $video_id})
+        MATCH (v:Post {post_id: $post_id})
         MATCH (s:Source {name: $source_name})
         MERGE (v)-[r:FROM]->(s)
         SET r.created_at = datetime(),
@@ -386,69 +386,69 @@ class Neo4jClient:
         
         with self._driver.session() as session:
             session.run(query,
-                       video_id=video_id,
+                       post_id=post_id,
                        source_name=source_name,
                        properties=properties or {})
 
-    def create_entity_relationships(self, relations: List[Dict[str, Any]], video_id: str = None):
+    def create_entity_relationships(self, relations: List[Dict[str, Any]], post_id: str = None):
         """
         Create relationships between entities based on extracted relations.
         
         Args:
             relations: List of relationship dictionaries with 'subject', 'relation', 'object'
-            video_id: Optional video ID for tracking relationship source
+            post_id: Optional post ID for tracking relationship source
         """
         for relation in relations:
-            self.upsert_relationship(relation, video_id)
+            self.upsert_relationship(relation, post_id)
     
-    def check_video_exists(self, video_id: str) -> bool:
+    def check_post_exists(self, post_id: str) -> bool:
         """
-        Check if a video already exists in the graph.
+        Check if a post already exists in the graph.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             
         Returns:
-            True if video exists, False otherwise
+            True if post exists, False otherwise
         """
-        query = "MATCH (v:Video {video_id: $video_id}) RETURN v LIMIT 1"
+        query = "MATCH (v:Post {post_id: $post_id}) RETURN v LIMIT 1"
         
         with self._driver.session() as session:
-            result = session.run(query, video_id=video_id)
+            result = session.run(query, post_id=post_id)
             return result.single() is not None
     
-    def check_user_video_relationship(self, user_id: str, video_id: str) -> bool:
+    def check_user_post_relationship(self, user_id: str, post_id: str) -> bool:
         """
-        Check if a user already has a CARES relationship with a video.
+        Check if a user already has a CARES relationship with a post.
         
         Args:
             user_id: User identifier
-            video_id: Video identifier
+            post_id: Post identifier
             
         Returns:
             True if relationship exists, False otherwise
         """
         query = """
-        MATCH (u:User {user_id: $user_id})-[r:CARES]->(v:Video {video_id: $video_id})
+        MATCH (u:User {user_id: $user_id})-[r:CARES]->(v:Post {post_id: $post_id})
         RETURN r LIMIT 1
         """
         
         with self._driver.session() as session:
-            result = session.run(query, user_id=user_id, video_id=video_id)
+            result = session.run(query, user_id=user_id, post_id=post_id)
             return result.single() is not None
     
-    def get_video_details(self, video_id: str) -> Dict[str, Any]:
+    def get_post_details(self, post_id: str) -> Dict[str, Any]:
         """
-        Get detailed information about an existing video.
+        Get detailed information about an existing post.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             
         Returns:
-            Dictionary containing video details and related entities
+            Dictionary containing post details and related entities
         """
         query = """
-        MATCH (v:Video {video_id: $video_id})
+        MATCH (v:Post {post_id: $post_id})
         OPTIONAL MATCH (v)-[:ABOUT]->(t:Topic)
         OPTIONAL MATCH (v)-[:FROM]->(s:Source)
         OPTIONAL MATCH (v)-[:MENTIONS]->(e:Entity)
@@ -459,14 +459,14 @@ class Neo4jClient:
         """
         
         with self._driver.session() as session:
-            result = session.run(query, video_id=video_id)
+            result = session.run(query, post_id=post_id)
             record = result.single()
             
             if not record:
                 return None
                 
             return {
-                'video': dict(record['v']),
+                'post': dict(record['v']),
                 'topics': [dict(topic) for topic in record['topics'] if topic],
                 'sources': [dict(source) for source in record['sources'] if source],
                 'entities': [dict(entity) for entity in record['entities'] if entity]
@@ -483,7 +483,7 @@ class Neo4jClient:
             'total_nodes': "MATCH (n) RETURN count(n) as count",
             'total_relationships': "MATCH ()-[r]->() RETURN count(r) as count",
             'users': "MATCH (n:User) RETURN count(n) as count",
-            'videos': "MATCH (n:Video) RETURN count(n) as count",
+            'posts': "MATCH (n:Post) RETURN count(n) as count",
             'topics': "MATCH (n:Topic) RETURN count(n) as count",
             'sources': "MATCH (n:Source) RETURN count(n) as count",
             'entities': "MATCH (n:Entity) RETURN count(n) as count",
@@ -520,18 +520,18 @@ class Neo4jClient:
             result = session.run(search_query, query=query, limit=limit)
             return [dict(record) for record in result]
     
-    def get_video_knowledge_graph(self, video_id: str) -> Dict[str, Any]:
+    def get_post_knowledge_graph(self, post_id: str) -> Dict[str, Any]:
         """
-        Get the complete knowledge graph for a specific video.
+        Get the complete knowledge graph for a specific post.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             
         Returns:
             Dictionary containing nodes and relationships
         """
         query = """
-        MATCH (v:Video {video_id: $video_id})-[r]-(n)
+        MATCH (v:Post {post_id: $post_id})-[r]-(n)
         RETURN v, r, n
         """
         
@@ -539,14 +539,14 @@ class Neo4jClient:
         relationships = []
         
         with self._driver.session() as session:
-            result = session.run(query, video_id=video_id)
+            result = session.run(query, post_id=post_id)
             
             for record in result:
-                # Add video node
-                video_node = dict(record["v"])
-                video_node["labels"] = ["Video"]
-                if video_node not in nodes:
-                    nodes.append(video_node)
+                # Add post node
+                post_node = dict(record["v"])
+                post_node["labels"] = ["Post"]
+                if post_node not in nodes:
+                    nodes.append(post_node)
                 
                 # Add connected node
                 connected_node = dict(record["n"])
@@ -557,7 +557,7 @@ class Neo4jClient:
                 # Add relationship
                 rel = dict(record["r"])
                 rel["type"] = record["r"].type
-                rel["start"] = video_node
+                rel["start"] = post_node
                 rel["end"] = connected_node
                 relationships.append(rel)
         
@@ -568,14 +568,14 @@ class Neo4jClient:
     
     # Graph Resolution Methods
     
-    def upsert_knowledge_graph_with_resolution(self, video_id: str, entities: List[Dict[str, str]], 
+    def upsert_knowledge_graph_with_resolution(self, post_id: str, entities: List[Dict[str, str]], 
                                               relationships: List[Dict[str, str]], 
                                               enable_resolution: bool = True) -> Dict[str, Any]:
         """
         Upsert knowledge graph with automatic resolution of duplicates.
         
         Args:
-            video_id: Video identifier
+            post_id: Post identifier
             entities: List of entity dictionaries
             relationships: List of relationship dictionaries
             enable_resolution: Whether to use LLM-based resolution
@@ -591,8 +591,8 @@ class Neo4jClient:
             ]
             
             # Perform graph resolution
-            resolution_stats = self._resolution_engine.resolve_and_merge_video_graph(
-                video_id, entities, relationship_tuples
+            resolution_stats = self._resolution_engine.resolve_and_merge_post_graph(
+                post_id, entities, relationship_tuples
             )
             
             # Apply entity mappings to relationships
@@ -619,19 +619,19 @@ class Neo4jClient:
         
         # Proceed with standard upsert for remaining entities
         for entity in entities_to_upsert:
-            self.upsert_entity(entity, video_id)
+            self.upsert_entity(entity, post_id)
         
         for relationship in resolved_relationships:
-            self.upsert_relationship(relationship, video_id)
+            self.upsert_relationship(relationship, post_id)
         
         return resolution_stats
     
-    def get_resolution_statistics(self, video_id: str = None) -> Dict[str, Any]:
+    def get_resolution_statistics(self, post_id: str = None) -> Dict[str, Any]:
         """
         Get graph resolution statistics.
         
         Args:
-            video_id: Optional specific video ID
+            post_id: Optional specific post ID
             
         Returns:
             Dictionary containing resolution statistics
@@ -640,7 +640,7 @@ class Neo4jClient:
             return {"error": "Resolution engine not available"}
         
         from .graph_resolution import get_resolution_statistics
-        return get_resolution_statistics(self._driver, video_id)
+        return get_resolution_statistics(self._driver, post_id)
     
     def get_conflict_flags(self, status: str = 'pending_review') -> List[Dict[str, Any]]:
         """
@@ -655,7 +655,7 @@ class Neo4jClient:
         query = """
         MATCH (c:ConflictFlag)
         WHERE c.status = $status
-        RETURN c.video_id as video_id,
+        RETURN c.post_id as post_id,
                c.new_relationship as new_relationship,
                c.existing_relationship as existing_relationship,
                c.reason as reason,
@@ -667,14 +667,14 @@ class Neo4jClient:
             result = session.run(query, status=status)
             return [dict(record) for record in result]
     
-    def resolve_conflict(self, video_id: str, new_relationship: str, 
+    def resolve_conflict(self, post_id: str, new_relationship: str, 
                         existing_relationship: str, resolution: str, 
                         resolved_by: str = None) -> bool:
         """
         Manually resolve a conflict flag.
         
         Args:
-            video_id: Video ID where conflict occurred
+            post_id: Post ID where conflict occurred
             new_relationship: New relationship string
             existing_relationship: Existing relationship string
             resolution: Resolution decision ('keep_existing', 'use_new', 'merge')
@@ -688,7 +688,7 @@ class Neo4jClient:
                 # Update conflict flag
                 session.run("""
                     MATCH (c:ConflictFlag {
-                        video_id: $video_id,
+                        post_id: $post_id,
                         new_relationship: $new_relationship,
                         existing_relationship: $existing_relationship
                     })
@@ -698,13 +698,13 @@ class Neo4jClient:
                         c.resolved_at = datetime()
                     RETURN c
                 """, 
-                video_id=video_id,
+                post_id=post_id,
                 new_relationship=new_relationship,
                 existing_relationship=existing_relationship,
                 resolution=resolution,
                 resolved_by=resolved_by)
                 
-                logger.info(f"Conflict resolved for video {video_id}: {resolution}")
+                logger.info(f"Conflict resolved for post {post_id}: {resolution}")
                 return True
                 
         except Exception as e:

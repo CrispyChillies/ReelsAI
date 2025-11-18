@@ -125,10 +125,10 @@ Guidelines:
 - Be conservative with cross-language merging unless entities are clearly equivalent"""
 
 # System prompt for graph-level entity resolution
-GRAPH_ENTITY_RESOLUTION_PROMPT = """You are an expert entity resolution system for knowledge graph merging. Your task is to identify duplicate entities across different video knowledge graphs that refer to the same real-world entity.
+GRAPH_ENTITY_RESOLUTION_PROMPT = """You are an expert entity resolution system for knowledge graph merging. Your task is to identify duplicate entities across different post knowledge graphs that refer to the same real-world entity.
 
 Given two lists of entities:
-1. NEW_ENTITIES: Entities from a new video being processed
+1. NEW_ENTITIES: Entities from a new post being processed
 2. EXISTING_ENTITIES: Entities already in the global knowledge graph
 
 Your job is to identify which new entities are duplicates of existing entities and should be merged.
@@ -171,7 +171,7 @@ Guidelines:
 RELATIONSHIP_RESOLUTION_PROMPT = """You are an expert relationship resolution system for knowledge graph merging. Your task is to identify duplicate or conflicting relationships when merging knowledge graphs.
 
 Given:
-1. NEW_RELATIONSHIPS: Relationships from a new video
+1. NEW_RELATIONSHIPS: Relationships from a new post
 2. EXISTING_RELATIONSHIPS: Relationships already in the global graph
 3. ENTITY_MAPPINGS: How new entities map to existing entities
 
