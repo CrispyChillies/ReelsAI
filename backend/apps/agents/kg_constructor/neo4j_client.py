@@ -152,6 +152,7 @@ class Neo4jClient:
         MERGE (v:Post {post_id: $post_id})
         SET v.title = $title,
             v.description = $description,
+            v.platform = $platform,
             v.duration = $duration,
             v.upload_date = $upload_date,
             v.url = $url,

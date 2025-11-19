@@ -144,6 +144,7 @@ class TextProcessor:
             post_data = payload['post'].copy()
             post_data.setdefault('title', f"Post_{post_data['post_id']}")
             post_data.setdefault('description', '')
+            post_data.setdefault('platform', '')
             post_data.setdefault('duration', 0)
             post_data.setdefault('upload_date', datetime.now().isoformat())
             post_data.setdefault('url', '')
@@ -616,6 +617,7 @@ EXAMPLE_PAYLOAD = {
     "post": {
         "post_id": "post_456",
         "title": "Introduction to Machine Learning",
+        "platform": "Tiktok",
         "description": "A comprehensive guide to ML basics",
         "duration": 1800,  # seconds
         "upload_date": "2025-11-10T10:00:00Z",

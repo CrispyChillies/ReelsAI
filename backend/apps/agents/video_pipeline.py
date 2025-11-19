@@ -1,7 +1,7 @@
 """
-Unified Video Processing Pipeline
+Unified Post Processing Pipeline
 
-This module combines video analysis (transcription, summarization) with 
+This module combines post analysis (transcription, summarization) with 
 knowledge graph construction into a single streamlined pipeline.
 """
 
@@ -15,23 +15,23 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 
 from .video_analysis.image_understanding import summarize_video
-from .kg_constructor.video_summarization_processor import VideoSummarizationProcessor
+from .kg_constructor.text_processor import TextProcessor
 from .kg_constructor.config import get_google_llm
 
 logger = logging.getLogger(__name__)
 
 
-class UnifiedVideoProcessor:
+class UnifiedPostProcessor:
     """
-    Complete pipeline that processes video files and creates knowledge graphs.
+    Complete pipeline that processes posts and creates knowledge graphs.
     
     Pipeline stages:
-    1. Video Analysis: Extract transcript and summary from video file
+    1. Post Analysis: Extract textual content from a post
     2. Knowledge Graph Construction: Create Neo4j knowledge graph from analysis
     """
     
     def __init__(self, 
-                 use_gemini_for_video: bool = True,
+                 use_gemini_for_post: bool = True,
                  use_whisper_for_audio: bool = True,
                  llm=None,
                  enable_kg_resolution: bool = True):
@@ -39,24 +39,24 @@ class UnifiedVideoProcessor:
         Initialize the unified processor.
         
         Args:
-            use_gemini_for_video: Use Gemini for video understanding (visual+audio)
+            use_gemini_for_post: Use Gemini for post understanding
             use_whisper_for_audio: Use OpenAI Whisper for audio transcription
             llm: Optional LLM instance for knowledge extraction
             enable_kg_resolution: Whether to enable graph resolution for duplicates
         """
-        self.use_gemini_for_video = use_gemini_for_video
+        self.use_gemini_for_post = use_gemini_for_post
         self.use_whisper_for_audio = use_whisper_for_audio
         
         # Initialize LLM for KG construction
         self.llm = llm or get_google_llm(model="gemini-2.5-flash")
         
         # Initialize KG processor
-        self.kg_processor = VideoSummarizationProcessor(
+        self.kg_processor = TextProcessor(
             llm=self.llm,
             enable_resolution=enable_kg_resolution
         )
         
-        logger.info(f"UnifiedVideoProcessor initialized - Gemini: {use_gemini_for_video}, "
+        logger.info(f"UnifiedPostProcessor initialized - Gemini: {use_gemini_for_post}, "
                    f"Whisper: {use_whisper_for_audio}, KG Resolution: {enable_kg_resolution}")
     
     def validate_video_payload(self, payload: Dict[str, Any]) -> bool:
@@ -85,7 +85,7 @@ class UnifiedVideoProcessor:
         # Validate video file
         video_file = payload.get('video_file')
         if not video_file:
-            logger.error("Video file is required")
+            logger.error("Post file is required")
             return False
         
         # Check if it's a valid file-like object
@@ -100,8 +100,8 @@ class UnifiedVideoProcessor:
         Extract analysis from video file using available methods.
         
         Args:
-            video_file: Video file object (Django UploadedFile or similar)
-            video_metadata: Video metadata for context
+            video_file: Post file object (Django UploadedFile or similar)
+            video_metadata: Post metadata for context
             
         Returns:
             Analysis result with transcript, summary, etc.
@@ -154,8 +154,8 @@ class UnifiedVideoProcessor:
             logger.error("All video analysis methods failed")
             
         except Exception as e:
-            analysis_result['error'] = f"Video analysis error: {e}"
-            logger.error(f"Video analysis error: {e}")
+            analysis_result['error'] = f"Post analysis error: {e}"
+            logger.error(f"Post analysis error: {e}")
         
         finally:
             analysis_result['processing_time_seconds'] = (datetime.now() - start_time).total_seconds()
@@ -167,7 +167,7 @@ class UnifiedVideoProcessor:
         Analyze video using Gemini video understanding.
         
         Args:
-            video_file: Video file object
+            video_file: Post file object
             
         Returns:
             Summary string from Gemini
@@ -240,7 +240,7 @@ class UnifiedVideoProcessor:
             'user': original_payload['user'],
             'video': {
                 'video_id': video_metadata['video_id'],
-                'title': video_metadata.get('title', f"Video {video_metadata['video_id']}"),
+                'title': video_metadata.get('title', f"Post {video_metadata['video_id']}"),
                 'description': video_metadata.get('description', ''),
                 'duration': video_metadata.get('duration', 0),
                 'upload_date': video_metadata.get('upload_date', datetime.now().isoformat()),
@@ -263,7 +263,7 @@ class UnifiedVideoProcessor:
         Complete pipeline: process video file and create knowledge graph.
         
         Args:
-            payload: Video processing payload with video_file
+            payload: Post processing payload with video_file
             
         Returns:
             Complete processing result
@@ -280,13 +280,13 @@ class UnifiedVideoProcessor:
             
             logger.info(f"Starting video processing pipeline for user: {user_id}")
             
-            # Stage 1: Video Analysis
+            # Stage 1: Post Analysis
             logger.info("Stage 1: Analyzing video content...")
             video_metadata = payload.get('video', {})
             analysis_result = self.extract_video_analysis(video_file, video_metadata)
             
             if analysis_result.get('error'):
-                # Video analysis failed
+                # Post analysis failed
                 processing_time = (datetime.now() - start_time).total_seconds()
                 return {
                     'status': 'error',
@@ -296,7 +296,7 @@ class UnifiedVideoProcessor:
                     'analysis_result': analysis_result
                 }
             
-            logger.info(f"Video analysis completed: {analysis_result['analysis_method']}")
+            logger.info(f"Post analysis completed: {analysis_result['analysis_method']}")
             
             # Stage 2: Knowledge Graph Construction
             logger.info("Stage 2: Constructing knowledge graph...")
@@ -312,7 +312,7 @@ class UnifiedVideoProcessor:
                 'pipeline_type': 'unified_video_to_kg',
                 'total_processing_time_seconds': total_processing_time,
                 
-                # Video analysis stage results
+                # Post analysis stage results
                 'video_analysis': {
                     'analysis_method': analysis_result['analysis_method'],
                     'detected_language': analysis_result['detected_language'],
@@ -354,7 +354,7 @@ def process_video_file_to_kg(video_file, user_data: Dict[str, Any],
     Convenience function to process a video file to knowledge graph.
     
     Args:
-        video_file: Video file object (Django UploadedFile, file handle, etc.)
+        video_file: Post file object (Django UploadedFile, file handle, etc.)
         user_data: User information dict with user_id
         video_metadata: Optional video metadata
         topic_data: Optional topic information
@@ -376,7 +376,7 @@ def process_video_file_to_kg(video_file, user_data: Dict[str, Any],
         'source': source_data
     }
     
-    processor = UnifiedVideoProcessor()
+    processor = UnifiedPostProcessor()
     return processor.process_video_to_knowledge_graph(payload)
 
 
