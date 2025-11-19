@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .serializers import ItemDataSerializer, QueryRequestSerializer
-from . import services
+from apps.agents.rag import utils
 
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
@@ -46,7 +46,7 @@ def add_item_view(request):
     if not s.is_valid():
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
-        res = services.insert_item(**s.validated_data)
+        res = utils.insert_item(**s.validated_data)
         return Response(res, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -63,7 +63,7 @@ def query_items_view(request):
     if not s.is_valid():
         return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
-        res = services.query_items(**s.validated_data)
+        res = utils.query_items(**s.validated_data)
         return Response(res, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

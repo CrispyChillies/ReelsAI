@@ -6,11 +6,12 @@ from pymilvus import (
     DataType,
     utility,
 )
+from django.conf import settings
 
 # ========= CONFIG =========
-ZILLIZ_URI = "https://in03-3a28b4019057a01.serverless.aws-eu-central-1.cloud.zilliz.com"
-ZILLIZ_TOKEN = "fd04e95024f15549f34465178ad131d6b646228f429eca8c469a4c218decc776ba584d111e86e1b40a006fad72f4b63822785d27"
-COLLECTION_NAME = "user_saved_items_embeddings"
+ZILLIZ_URI = settings.ZILLIZ_URI
+ZILLIZ_TOKEN = settings.ZILLIZ_TOKEN
+COLLECTION_NAME = settings.COLLECTION_NAME
 
 # ========= CONNECT =========
 connections.connect(alias="default", uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
