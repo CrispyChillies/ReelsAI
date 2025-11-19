@@ -375,7 +375,7 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
       {/* Footer */}
       <nav className="footer">
         <NavBtn
-          onClick={go("/")}
+          onClick={go("/feed")}
           data-active={pathname === "/" || pathname === "/feed" ? "true" : "false"}
           title={t("feed")}
         >

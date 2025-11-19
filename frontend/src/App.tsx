@@ -34,7 +34,7 @@ export default function App() {
 
       {/* ===== App routes with sidebar ===== */}
       <Route element={<AppLayout />}>
-        <Route path="/" element={<NewsfeedPage />} />
+        <Route path="/app" element={<NewsfeedPage />} />
         <Route path="/feed" element={<NewsfeedPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/saved" element={<SavedContent />} />
@@ -42,7 +42,7 @@ export default function App() {
       </Route>
 
       {/* fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/signin" replace />} />
     </Routes>
   );
 }
