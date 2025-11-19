@@ -16,7 +16,6 @@ ADD_ITEM_EXAMPLE = OpenApiExample(
         "user_id": "strongtherapy",
         "platform": "tiktok",
         "summary": "Part 2: quality mental healthcare is a privilege. #tiktoktherapy",
-        "timestamp": 1700000000,
     },
     request_only=True,
 )

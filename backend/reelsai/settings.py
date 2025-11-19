@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.graph",
     "apps.agents",
     "apps.chatbot",
+    "apps.saved_items",
 ]
 
 MIDDLEWARE = [
@@ -95,13 +96,13 @@ WSGI_APPLICATION = "reelsai.wsgi.application"
 # }
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('DB_NAME', 'reelsai'),
-        'USER': os.getenv('DB_USER', 'reelsai'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'reelsai'), 
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": os.getenv("DB_NAME", "reelsai"),
+        "USER": os.getenv("DB_USER", "reelsai"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "reelsai"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
         # "OPTIONS": {"sslmode": os.getenv("DB_SSLMODE", "require")}
     }
 }
@@ -216,3 +217,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+
+# Supabase configuration
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
