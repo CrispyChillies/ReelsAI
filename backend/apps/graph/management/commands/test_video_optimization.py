@@ -4,7 +4,7 @@ Management command to test video processing optimization cases.
 import json
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from apps.agents.kg_constructor.video_summarization_processor import VideoSummarizationProcessor
+from apps.agents.kg_constructor.text_processor import TextProcessor
 
 
 class Command(BaseCommand):
@@ -32,7 +32,7 @@ class Command(BaseCommand):
         
         try:
             # Initialize processor with or without resolution
-            processor = VideoSummarizationProcessor(enable_resolution=enable_resolution)
+            processor = TextProcessor(enable_resolution=enable_resolution)
             
             if clear_db:
                 self.stdout.write('Clearing database...')

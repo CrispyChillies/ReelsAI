@@ -4,8 +4,8 @@ from . import views
 app_name = 'graph'
 
 urlpatterns = [
-    # Video summarization processing
-    path('process-video-summarization/', views.process_video_summarization, name='process_video_summarization'),
+    # Text processing
+    path('process-text/', views.process_post_text, name='process_text'),
     
     # Request management
     path('requests/<int:request_id>/', views.get_processing_status, name='get_processing_status'),
@@ -14,7 +14,7 @@ urlpatterns = [
     # Knowledge graph queries
     path('statistics/', views.get_graph_statistics, name='get_graph_statistics'),
     path('search/', views.search_entities, name='search_entities'),
-    path('videos/<str:video_id>/graph/', views.get_video_knowledge_graph, name='get_video_knowledge_graph'),
+    path('posts/<str:post_id>/graph/', views.get_post_knowledge_graph, name='get_post_knowledge_graph'),
     
     # Graph resolution and conflict management
     path('resolution/statistics/', views.get_resolution_statistics, name='get_resolution_statistics'),

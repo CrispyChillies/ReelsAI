@@ -3,12 +3,12 @@ from django.contrib.auth.models import User
 import json
 
 
-class VideoSummarizationRequest(models.Model):
+class TextProcessingRequest(models.Model):
     """
-    Model to track video summarization processing requests.
+    Model to track text processing requests.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='summarization_requests')
-    video_id = models.CharField(max_length=255, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='text_processing_requests')
+    post_id = models.CharField(max_length=255, db_index=True)
     topic = models.CharField(max_length=500)
     source = models.CharField(max_length=255)
     
@@ -22,7 +22,7 @@ class VideoSummarizationRequest(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
     # Request data
-    payload = models.JSONField(help_text="Original video summarization payload")
+    payload = models.JSONField(help_text="Original text processing payload")
     
     # Processing results
     processing_result = models.JSONField(null=True, blank=True, help_text="Processing result from pipeline")
@@ -38,13 +38,13 @@ class VideoSummarizationRequest(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['video_id', 'status']),
+            models.Index(fields=['post_id', 'status']),
             models.Index(fields=['user', 'created_at']),
             models.Index(fields=['status', 'created_at']),
         ]
     
     def __str__(self):
-        return f"SummarizationRequest({self.video_id}) - {self.status}"
+        return f"TextProcessingRequest({self.post_id}) - {self.status}"
     
     @property
     def extracted_entities_count(self):
@@ -71,7 +71,7 @@ class KnowledgeGraphStatistics(models.Model):
     total_nodes = models.IntegerField(default=0)
     total_relationships = models.IntegerField(default=0)
     user_nodes = models.IntegerField(default=0)
-    video_nodes = models.IntegerField(default=0)
+    post_nodes = models.IntegerField(default=0)
     topic_nodes = models.IntegerField(default=0)
     source_nodes = models.IntegerField(default=0)
     entity_nodes = models.IntegerField(default=0)
@@ -98,7 +98,7 @@ class KnowledgeGraphStatistics(models.Model):
             total_nodes=stats.get('total_nodes', 0),
             total_relationships=stats.get('total_relationships', 0),
             user_nodes=stats.get('users', 0),
-            video_nodes=stats.get('videos', 0),
+            post_nodes=stats.get('posts', 0),
             topic_nodes=stats.get('topics', 0),
             source_nodes=stats.get('sources', 0),
             entity_nodes=stats.get('entities', 0),

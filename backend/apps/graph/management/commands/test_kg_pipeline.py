@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 import json
 
-from apps.agents.kg_constructor.video_summarization_processor import VideoSummarizationProcessor, EXAMPLE_PAYLOAD
+from apps.agents.kg_constructor.text_processor import TextProcessor, EXAMPLE_PAYLOAD
 from apps.graph.models import KnowledgeGraphStatistics
 from apps.agents.kg_constructor.config import get_google_llm
 
@@ -31,7 +31,7 @@ class Command(BaseCommand):
         self.stdout.write('=' * 80)
 
         try:
-            processor = VideoSummarizationProcessor()
+            processor = TextProcessor()
             
             # Test connection first
             if not processor.neo4j_client.test_connection():

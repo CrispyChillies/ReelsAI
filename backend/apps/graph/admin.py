@@ -1,18 +1,18 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
-from .models import VideoSummarizationRequest, KnowledgeGraphStatistics
+from .models import TextProcessingRequest, KnowledgeGraphStatistics
 
 
-@admin.register(VideoSummarizationRequest)
-class VideoSummarizationRequestAdmin(admin.ModelAdmin):
+@admin.register(TextProcessingRequest)
+class TextProcessingRequestAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'user', 'video_id', 'topic', 'status', 
+        'id', 'user', 'post_id', 'topic', 'status', 
         'extracted_entities_count', 'extracted_relations_count',
         'processing_time_seconds', 'created_at'
     ]
     list_filter = ['status', 'created_at', 'processing_started_at']
-    search_fields = ['video_id', 'topic', 'source', 'user__username']
+    search_fields = ['post_id', 'topic', 'source', 'user__username']
     readonly_fields = [
         'id', 'created_at', 'updated_at', 'processing_started_at', 
         'processing_completed_at', 'processing_time_seconds',
@@ -21,7 +21,7 @@ class VideoSummarizationRequestAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('user', 'video_id', 'topic', 'source', 'status')
+            'fields': ('user', 'post_id', 'topic', 'source', 'status')
         }),
         ('Processing Details', {
             'fields': (
@@ -72,13 +72,13 @@ class VideoSummarizationRequestAdmin(admin.ModelAdmin):
 class KnowledgeGraphStatisticsAdmin(admin.ModelAdmin):
     list_display = [
         'timestamp', 'total_nodes', 'total_relationships',
-        'user_nodes', 'video_nodes', 'topic_nodes', 
+        'user_nodes', 'post_nodes', 'topic_nodes', 
         'source_nodes', 'entity_nodes'
     ]
     list_filter = ['timestamp']
     readonly_fields = [
         'timestamp', 'total_nodes', 'total_relationships',
-        'user_nodes', 'video_nodes', 'topic_nodes', 
+        'user_nodes', 'post_nodes', 'topic_nodes', 
         'source_nodes', 'entity_nodes', 'statistics_data'
     ]
     

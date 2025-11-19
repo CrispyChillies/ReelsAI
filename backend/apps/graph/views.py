@@ -5,21 +5,135 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.db import transaction
 from django.conf import settings
+from drf_spectacular.utils import (
+    extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
+)
 import logging
 import json
 
-from .models import VideoSummarizationRequest, KnowledgeGraphStatistics
-from ..agents.kg_constructor.video_summarization_processor import VideoSummarizationProcessor
+from .models import TextProcessingRequest, KnowledgeGraphStatistics
+from ..agents.kg_constructor.text_processor import TextProcessor
 from ..agents.kg_constructor.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Process Text",
+    description="Process text content to extract entities and relationships, then create knowledge graph nodes.",
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'user': {
+                    'type': 'object',
+                    'properties': {
+                        'user_id': {'type': 'string'},
+                        'name': {'type': 'string'},
+                        'email': {'type': 'string'}
+                    },
+                    'required': ['user_id']
+                },
+                'post': {
+                    'type': 'object',
+                    'properties': {
+                        'post_id': {'type': 'string'},
+                        'title': {'type': 'string'},
+                        'description': {'type': 'string'},
+                        'duration': {'type': 'integer'},
+                        'upload_date': {'type': 'string', 'format': 'date-time'},
+                        'url': {'type': 'string'}
+                    },
+                    'required': ['post_id']
+                },
+                'topic': {
+                    'type': 'object',
+                    'properties': {
+                        'name': {'type': 'string'},
+                        'description': {'type': 'string'},
+                        'category': {'type': 'string'}
+                    }
+                },
+                'source': {
+                    'type': 'object',
+                    'properties': {
+                        'name': {'type': 'string'},
+                        'type': {'type': 'string'},
+                        'url': {'type': 'string'},
+                        'description': {'type': 'string'}
+                    }
+                },
+                'text': {'type': 'string'}
+            },
+            'required': ['user', 'post', 'text']
+        }
+    },
+    responses={
+        200: OpenApiResponse(
+            description="Post processed successfully",
+            examples=[
+                OpenApiExample(
+                    "Success Response",
+                    value={
+                        "request_id": 123,
+                        "status": "success",
+                        "processing_time_seconds": 15.3,
+                        "extracted_entities": 25,
+                        "extracted_relations": 18,
+                        "upserted_entities": 20,
+                        "graph_statistics": {
+                            "total_nodes": 1250,
+                            "total_relationships": 890
+                        },
+                        "node_ids": ["node_1", "node_2"],
+                        "message": "Post text processed successfully"
+                    }
+                )
+            ]
+        ),
+        400: OpenApiResponse(description="Bad request - missing required fields"),
+        500: OpenApiResponse(description="Processing failed")
+    },
+    examples=[
+        OpenApiExample(
+            "Post Text Processing Request",
+            value={
+                "user": {
+                    "user_id": "user_123",
+                    "name": "John Doe",
+                    "email": "john@example.com"
+                },
+                "post": {
+                    "post_id": "post_456",
+                    "title": "Machine Learning Basics",
+                    "description": "Introduction to ML concepts",
+                    "duration": 1800,
+                    "upload_date": "2025-11-10T10:00:00Z",
+                    "url": "https://example.com/post/456"
+                },
+                "topic": {
+                    "name": "Machine Learning",
+                    "description": "AI and ML concepts",
+                    "category": "Technology"
+                },
+                "source": {
+                    "name": "Educational Platform",
+                    "type": "Online Course",
+                    "url": "https://platform.example.com",
+                    "description": "Online learning platform"
+                },
+                "text": "This post covers fundamental machine learning concepts including supervised learning, neural networks, and practical applications..."
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def process_video_summarization(request):
+def process_post_text(request):
     """
-    Process video summarization and create knowledge graph.
+    Process post text and create knowledge graph.
     
     Expected payload:
     {
@@ -28,13 +142,13 @@ def process_video_summarization(request):
             "name": "John Doe",
             "email": "john@example.com"
         },
-        "video": {
-            "video_id": "video_456",
-            "title": "Video Title",
-            "description": "Video description",
+        "post": {
+            "post_id": "post_456",
+            "title": "Post Title",
+            "description": "Post description",
             "duration": 1800,
             "upload_date": "2025-11-10T10:00:00Z",
-            "url": "https://example.com/video/456"
+            "url": "https://example.com/post/456"
         },
         "topic": {
             "name": "Machine Learning",
@@ -47,7 +161,7 @@ def process_video_summarization(request):
             "url": "https://source.example.com",
             "description": "Source description"
         },
-        "summarization": "The video summarization text content..."
+        "text": "The post text content..."
     }
     """
     try:
@@ -60,24 +174,24 @@ def process_video_summarization(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Extract basic information for tracking
-        video_data = payload.get('video', {})
+        post_data = payload.get('post', {})
         topic_data = payload.get('topic', {})
         source_data = payload.get('source', {})
         
-        video_id = video_data.get('video_id', '')
+        post_id = post_data.get('post_id', '')
         topic_name = topic_data.get('name', '') if isinstance(topic_data, dict) else str(topic_data)
         source_name = source_data.get('name', '') if isinstance(source_data, dict) else str(source_data)
         
-        if not video_id:
+        if not post_id:
             return Response({
-                'error': 'video_id is required'
+                'error': 'post_id is required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create tracking record
         with transaction.atomic():
-            summarization_request = VideoSummarizationRequest.objects.create(
+            text_processing_request = TextProcessingRequest.objects.create(
                 user=request.user,
-                video_id=video_id,
+                post_id=post_id,
                 topic=topic_name,
                 source=source_name,
                 payload=payload,
@@ -86,23 +200,23 @@ def process_video_summarization(request):
             )
         
         try:
-            # Process the video summarization
-            processor = VideoSummarizationProcessor()
-            result = processor.process_video_summarization(payload)
+            # Process the post text
+            processor = TextProcessor()
+            result = processor.process_text(payload)
             
             # Update tracking record with results
             with transaction.atomic():
-                summarization_request.processing_completed_at = timezone.now()
-                summarization_request.processing_time_seconds = result.get('processing_time_seconds')
-                summarization_request.processing_result = result
+                text_processing_request.processing_completed_at = timezone.now()
+                text_processing_request.processing_time_seconds = result.get('processing_time_seconds')
+                text_processing_request.processing_result = result
                 
                 if result.get('status') == 'success':
-                    summarization_request.status = 'completed'
+                    text_processing_request.status = 'completed'
                 else:
-                    summarization_request.status = 'failed'
-                    summarization_request.error_message = result.get('error_message', 'Unknown error')
+                    text_processing_request.status = 'failed'
+                    text_processing_request.error_message = result.get('error_message', 'Unknown error')
                 
-                summarization_request.save()
+                text_processing_request.save()
             
             # Create statistics snapshot if successful
             if result.get('status') == 'success' and result.get('graph_statistics'):
@@ -110,7 +224,7 @@ def process_video_summarization(request):
             
             # Return success response
             return Response({
-                'request_id': summarization_request.id,
+                'request_id': text_processing_request.id,
                 'status': result.get('status'),
                 'processing_time_seconds': result.get('processing_time_seconds'),
                 'extracted_entities': result.get('extracted_entities', 0),
@@ -118,81 +232,187 @@ def process_video_summarization(request):
                 'upserted_entities': result.get('upserted_entities', 0),
                 'graph_statistics': result.get('graph_statistics'),
                 'node_ids': result.get('node_ids'),
-                'message': 'Video summarization processed successfully' if result.get('status') == 'success' else result.get('error_message')
+                'message': 'Post text processed successfully' if result.get('status') == 'success' else result.get('error_message')
             }, status=status.HTTP_200_OK if result.get('status') == 'success' else status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         except Exception as e:
-            logger.error(f"Error processing video summarization: {e}")
+            logger.error(f"Error processing text: {e}")
             
             # Update tracking record with error
             with transaction.atomic():
-                summarization_request.status = 'failed'
-                summarization_request.error_message = str(e)
-                summarization_request.processing_completed_at = timezone.now()
-                summarization_request.save()
+                text_processing_request.status = 'failed'
+                text_processing_request.error_message = str(e)
+                text_processing_request.processing_completed_at = timezone.now()
+                text_processing_request.save()
             
             return Response({
-                'request_id': summarization_request.id,
+                'request_id': text_processing_request.id,
                 'error': f'Processing failed: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     except Exception as e:
-        logger.error(f"Unexpected error in process_video_summarization: {e}")
+        logger.error(f"Unexpected error in process_text: {e}")
         return Response({
             'error': f'Unexpected error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Get Processing Status",
+    description="Retrieve the status and results of a text processing request.",
+    parameters=[
+        OpenApiParameter(
+            name="request_id",
+            description="ID of the processing request",
+            required=True,
+            type=int,
+            location=OpenApiParameter.PATH
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="Request status retrieved successfully",
+            examples=[
+                OpenApiExample(
+                    "Processing Status",
+                    value={
+                        "request_id": 123,
+                        "status": "completed",
+                        "post_id": "post_456",
+                        "topic": "Machine Learning",
+                        "source": "Educational Platform",
+                        "created_at": "2025-11-17T10:00:00Z",
+                        "processing_started_at": "2025-11-17T10:00:05Z",
+                        "processing_completed_at": "2025-11-17T10:00:20Z",
+                        "processing_time_seconds": 15.3,
+                        "extracted_entities_count": 25,
+                        "extracted_relations_count": 18,
+                        "error_message": None,
+                        "processing_result": {
+                            "status": "success",
+                            "graph_statistics": {}
+                        }
+                    }
+                )
+            ]
+        ),
+        404: OpenApiResponse(description="Request not found")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_processing_status(request, request_id):
     """
-    Get the status of a video summarization processing request.
+    Get the status of a text processing request.
     """
     try:
-        summarization_request = VideoSummarizationRequest.objects.get(
+        text_processing_request = TextProcessingRequest.objects.get(
             id=request_id,
             user=request.user
         )
         
         return Response({
-            'request_id': summarization_request.id,
-            'status': summarization_request.status,
-            'video_id': summarization_request.video_id,
-            'topic': summarization_request.topic,
-            'source': summarization_request.source,
-            'created_at': summarization_request.created_at,
-            'processing_started_at': summarization_request.processing_started_at,
-            'processing_completed_at': summarization_request.processing_completed_at,
-            'processing_time_seconds': summarization_request.processing_time_seconds,
-            'extracted_entities_count': summarization_request.extracted_entities_count,
-            'extracted_relations_count': summarization_request.extracted_relations_count,
-            'error_message': summarization_request.error_message,
-            'processing_result': summarization_request.processing_result
+            'request_id': text_processing_request.id,
+            'status': text_processing_request.status,
+            'post_id': text_processing_request.post_id,
+            'topic': text_processing_request.topic,
+            'source': text_processing_request.source,
+            'created_at': text_processing_request.created_at,
+            'processing_started_at': text_processing_request.processing_started_at,
+            'processing_completed_at': text_processing_request.processing_completed_at,
+            'processing_time_seconds': text_processing_request.processing_time_seconds,
+            'extracted_entities_count': text_processing_request.extracted_entities_count,
+            'extracted_relations_count': text_processing_request.extracted_relations_count,
+            'error_message': text_processing_request.error_message,
+            'processing_result': text_processing_request.processing_result
         }, status=status.HTTP_200_OK)
     
-    except VideoSummarizationRequest.DoesNotExist:
+    except TextProcessingRequest.DoesNotExist:
         return Response({
             'error': 'Request not found'
         }, status=status.HTTP_404_NOT_FOUND)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="List User Requests",
+    description="Get a paginated list of text processing requests for the authenticated user.",
+    parameters=[
+        OpenApiParameter(
+            name="status",
+            description="Filter by request status",
+            required=False,
+            type=str,
+            enum=["processing", "completed", "failed"]
+        ),
+        OpenApiParameter(
+            name="post_id",
+            description="Filter by post ID",
+            required=False,
+            type=str
+        ),
+        OpenApiParameter(
+            name="page_size",
+            description="Number of results per page (max 100)",
+            required=False,
+            type=int,
+            default=20
+        ),
+        OpenApiParameter(
+            name="page",
+            description="Page number",
+            required=False,
+            type=int,
+            default=1
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="User requests retrieved successfully",
+            examples=[
+                OpenApiExample(
+                    "User Requests List",
+                    value={
+                        "count": 5,
+                        "page": 1,
+                        "page_size": 20,
+                        "requests": [
+                            {
+                                "request_id": 123,
+                                "status": "completed",
+                                "post_id": "post_456",
+                                "topic": "Machine Learning",
+                                "source": "Educational Platform",
+                                "created_at": "2025-11-17T10:00:00Z",
+                                "processing_time_seconds": 15.3,
+                                "extracted_entities_count": 25,
+                                "extracted_relations_count": 18,
+                                "error_message": None
+                            }
+                        ]
+                    }
+                )
+            ]
+        )
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_user_requests(request):
     """
-    List all video summarization requests for the authenticated user.
+    List all post text processing requests for the authenticated user.
     """
-    requests = VideoSummarizationRequest.objects.filter(user=request.user)
+    requests = TextProcessingRequest.objects.filter(user=request.user)
     
     # Apply filters
     status_filter = request.GET.get('status')
     if status_filter:
         requests = requests.filter(status=status_filter)
     
-    video_id_filter = request.GET.get('video_id')
-    if video_id_filter:
-        requests = requests.filter(video_id=video_id_filter)
+    post_id_filter = request.GET.get('post_id')
+    if post_id_filter:
+        requests = requests.filter(post_id=post_id_filter)
     
     # Pagination
     page_size = min(int(request.GET.get('page_size', 20)), 100)
@@ -211,7 +431,7 @@ def list_user_requests(request):
             {
                 'request_id': req.id,
                 'status': req.status,
-                'video_id': req.video_id,
+                'post_id': req.post_id,
                 'topic': req.topic,
                 'source': req.source,
                 'created_at': req.created_at,
@@ -224,6 +444,43 @@ def list_user_requests(request):
     }, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Get Graph Statistics",
+    description="Retrieve current knowledge graph statistics including node and relationship counts.",
+    responses={
+        200: OpenApiResponse(
+            description="Graph statistics retrieved successfully",
+            examples=[
+                OpenApiExample(
+                    "Graph Statistics",
+                    value={
+                        "current_stats": {
+                            "total_nodes": 1250,
+                            "total_relationships": 890,
+                            "user_nodes": 50,
+                            "post_nodes": 200,
+                            "topic_nodes": 100,
+                            "source_nodes": 25,
+                            "entity_nodes": 875
+                        },
+                        "latest_stored_stats": {
+                            "timestamp": "2025-11-17T09:30:00Z",
+                            "total_nodes": 1245,
+                            "total_relationships": 885,
+                            "user_nodes": 50,
+                            "post_nodes": 199,
+                            "topic_nodes": 100,
+                            "source_nodes": 25,
+                            "entity_nodes": 871
+                        }
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Failed to retrieve statistics")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_graph_statistics(request):
@@ -249,7 +506,7 @@ def get_graph_statistics(request):
                 'total_nodes': latest_stored_stats.total_nodes,
                 'total_relationships': latest_stored_stats.total_relationships,
                 'user_nodes': latest_stored_stats.user_nodes,
-                'video_nodes': latest_stored_stats.video_nodes,
+                'post_nodes': latest_stored_stats.post_nodes,
                 'topic_nodes': latest_stored_stats.topic_nodes,
                 'source_nodes': latest_stored_stats.source_nodes,
                 'entity_nodes': latest_stored_stats.entity_nodes
@@ -263,6 +520,52 @@ def get_graph_statistics(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Search Entities",
+    description="Search for entities in the knowledge graph by name or properties.",
+    parameters=[
+        OpenApiParameter(
+            name="q",
+            description="Search query",
+            required=True,
+            type=str
+        ),
+        OpenApiParameter(
+            name="limit",
+            description="Maximum number of results (max 100)",
+            required=False,
+            type=int,
+            default=10
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="Entities found",
+            examples=[
+                OpenApiExample(
+                    "Search Results",
+                    value={
+                        "query": "machine learning",
+                        "entities": [
+                            {
+                                "id": "entity_123",
+                                "name": "Machine Learning",
+                                "type": "Concept",
+                                "properties": {
+                                    "description": "AI technique for pattern recognition"
+                                }
+                            }
+                        ],
+                        "count": 1
+                    }
+                )
+            ]
+        ),
+        400: OpenApiResponse(description="Query parameter required"),
+        500: OpenApiResponse(description="Search failed")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def search_entities(request):
@@ -295,19 +598,67 @@ def search_entities(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Get Post Knowledge Graph",
+    description="Retrieve the complete knowledge graph for a specific post including all nodes and relationships.",
+    parameters=[
+        OpenApiParameter(
+            name="post_id",
+            description="ID of the post",
+            required=True,
+            type=str,
+            location=OpenApiParameter.PATH
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="Post knowledge graph retrieved",
+            examples=[
+                OpenApiExample(
+                    "Post Graph",
+                    value={
+                        "post_id": "post_456",
+                        "nodes": [
+                            {
+                                "id": "entity_123",
+                                "name": "Machine Learning",
+                                "type": "Concept",
+                                "properties": {}
+                            }
+                        ],
+                        "relationships": [
+                            {
+                                "id": "rel_456",
+                                "source": "entity_123",
+                                "target": "entity_789",
+                                "type": "relates_to"
+                            }
+                        ],
+                        "summary": {
+                            "node_count": 25,
+                            "relationship_count": 18
+                        }
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Failed to retrieve graph")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def get_video_knowledge_graph(request, video_id):
+def get_post_knowledge_graph(request, post_id):
     """
-    Get the complete knowledge graph for a specific video.
+    Get the complete knowledge graph for a specific post.
     """
     try:
         neo4j_client = Neo4jClient()
-        graph_data = neo4j_client.get_video_knowledge_graph(video_id)
+        graph_data = neo4j_client.get_post_knowledge_graph(post_id)
         neo4j_client.close()
         
         return Response({
-            'video_id': video_id,
+            'post_id': post_id,
             'nodes': graph_data['nodes'],
             'relationships': graph_data['relationships'],
             'summary': {
@@ -317,12 +668,39 @@ def get_video_knowledge_graph(request, video_id):
         }, status=status.HTTP_200_OK)
     
     except Exception as e:
-        logger.error(f"Error getting video knowledge graph: {e}")
+        logger.error(f"Error getting post knowledge graph: {e}")
         return Response({
-            'error': f'Failed to get video knowledge graph: {str(e)}'
+            'error': f'Failed to get post knowledge graph: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Test Neo4j Connection",
+    description="Test the connection to the Neo4j knowledge graph database.",
+    responses={
+        200: OpenApiResponse(
+            description="Connection test completed",
+            examples=[
+                OpenApiExample(
+                    "Connection Success",
+                    value={
+                        "connected": True,
+                        "message": "Connection successful"
+                    }
+                ),
+                OpenApiExample(
+                    "Connection Failed",
+                    value={
+                        "connected": False,
+                        "message": "Connection failed"
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Connection test failed")
+    }
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def test_neo4j_connection(request):
@@ -346,6 +724,40 @@ def test_neo4j_connection(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Get Resolution Statistics",
+    description="Retrieve graph resolution statistics for conflict detection and entity merging.",
+    parameters=[
+        OpenApiParameter(
+            name="post_id",
+            description="Optional specific post ID to filter statistics",
+            required=False,
+            type=str
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="Resolution statistics retrieved",
+            examples=[
+                OpenApiExample(
+                    "Resolution Stats",
+                    value={
+                        "resolution_statistics": {
+                            "total_conflicts_detected": 15,
+                            "conflicts_resolved": 12,
+                            "pending_conflicts": 3,
+                            "entities_merged": 8,
+                            "relationships_updated": 20
+                        },
+                        "post_id": "post_456"
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Failed to get statistics")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_resolution_statistics(request):
@@ -353,18 +765,18 @@ def get_resolution_statistics(request):
     Get graph resolution statistics.
     
     Query parameters:
-    - video_id: Optional specific video ID
+    - post_id: Optional specific post ID
     """
     try:
-        video_id = request.GET.get('video_id', None)
+        post_id = request.GET.get('post_id', None)
         
         neo4j_client = Neo4jClient()
-        stats = neo4j_client.get_resolution_statistics(video_id)
+        stats = neo4j_client.get_resolution_statistics(post_id)
         neo4j_client.close()
         
         return Response({
             'resolution_statistics': stats,
-            'video_id': video_id
+            'post_id': post_id
         }, status=status.HTTP_200_OK)
     
     except Exception as e:
@@ -374,6 +786,48 @@ def get_resolution_statistics(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Get Conflict Flags",
+    description="Retrieve conflict flags that need manual review for entity and relationship conflicts.",
+    parameters=[
+        OpenApiParameter(
+            name="status",
+            description="Filter conflicts by status",
+            required=False,
+            type=str,
+            default="pending_review",
+            enum=["pending_review", "resolved", "ignored"]
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description="Conflict flags retrieved",
+            examples=[
+                OpenApiExample(
+                    "Conflict Flags",
+                    value={
+                        "conflicts": [
+                            {
+                                "conflict_id": "conf_123",
+                                "post_id": "post_456",
+                                "new_relationship": "[\"EntityA\", \"relates_to\", \"EntityB\"]",
+                                "existing_relationship": "[\"EntityA\", \"connects_to\", \"EntityB\"]",
+                                "confidence_new": 0.85,
+                                "confidence_existing": 0.75,
+                                "status": "pending_review",
+                                "created_at": "2025-11-17T10:00:00Z"
+                            }
+                        ],
+                        "count": 1,
+                        "status_filter": "pending_review"
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Failed to get conflicts")
+    }
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_conflict_flags(request):
@@ -403,6 +857,56 @@ def get_conflict_flags(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Resolve Conflict",
+    description="Manually resolve a detected conflict between entities or relationships in the knowledge graph.",
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'post_id': {'type': 'string'},
+                'new_relationship': {'type': 'string'},
+                'existing_relationship': {'type': 'string'},
+                'resolution': {
+                    'type': 'string',
+                    'enum': ['keep_existing', 'use_new', 'merge']
+                },
+                'comment': {'type': 'string'}
+            },
+            'required': ['post_id', 'new_relationship', 'existing_relationship', 'resolution']
+        }
+    },
+    responses={
+        200: OpenApiResponse(
+            description="Conflict resolved successfully",
+            examples=[
+                OpenApiExample(
+                    "Resolution Success",
+                    value={
+                        "message": "Conflict resolved successfully",
+                        "resolution": "keep_existing"
+                    }
+                )
+            ]
+        ),
+        400: OpenApiResponse(description="Invalid request data"),
+        500: OpenApiResponse(description="Failed to resolve conflict")
+    },
+    examples=[
+        OpenApiExample(
+            "Resolve Conflict Request",
+            value={
+                "post_id": "post_456",
+                "new_relationship": "[\"EntityA\", \"relates_to\", \"EntityB\"]",
+                "existing_relationship": "[\"EntityA\", \"connects_to\", \"EntityB\"]",
+                "resolution": "keep_existing",
+                "comment": "Existing relationship is more accurate"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def resolve_conflict(request):
@@ -411,7 +915,7 @@ def resolve_conflict(request):
     
     Expected payload:
     {
-        "video_id": "video_123",
+        "post_id": "post_123",
         "new_relationship": "[\"EntityA\", \"relates_to\", \"EntityB\"]",
         "existing_relationship": "[\"EntityA\", \"connects_to\", \"EntityB\"]",
         "resolution": "keep_existing",  # Options: "keep_existing", "use_new", "merge"
@@ -422,7 +926,7 @@ def resolve_conflict(request):
         data = request.data
         
         # Validate required fields
-        required_fields = ['video_id', 'new_relationship', 'existing_relationship', 'resolution']
+        required_fields = ['post_id', 'new_relationship', 'existing_relationship', 'resolution']
         for field in required_fields:
             if field not in data:
                 return Response({
@@ -438,7 +942,7 @@ def resolve_conflict(request):
         
         neo4j_client = Neo4jClient()
         success = neo4j_client.resolve_conflict(
-            video_id=data['video_id'],
+            post_id=data['post_id'],
             new_relationship=data['new_relationship'],
             existing_relationship=data['existing_relationship'],
             resolution=data['resolution'],
@@ -463,6 +967,57 @@ def resolve_conflict(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@extend_schema(
+    tags=["Knowledge Graph"],
+    summary="Toggle Resolution Engine",
+    description="Enable or disable the graph resolution engine for automatic conflict detection and resolution.",
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'enable': {
+                    'type': 'boolean',
+                    'description': 'Whether to enable or disable the resolution engine'
+                }
+            },
+            'required': ['enable']
+        }
+    },
+    responses={
+        200: OpenApiResponse(
+            description="Resolution engine toggled successfully",
+            examples=[
+                OpenApiExample(
+                    "Engine Enabled",
+                    value={
+                        "message": "Graph resolution engine enabled",
+                        "resolution_enabled": True
+                    }
+                ),
+                OpenApiExample(
+                    "Engine Disabled",
+                    value={
+                        "message": "Graph resolution engine disabled",
+                        "resolution_enabled": False
+                    }
+                )
+            ]
+        ),
+        500: OpenApiResponse(description="Failed to toggle resolution engine")
+    },
+    examples=[
+        OpenApiExample(
+            "Enable Resolution Engine",
+            value={"enable": True},
+            request_only=True
+        ),
+        OpenApiExample(
+            "Disable Resolution Engine",
+            value={"enable": False},
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_resolution_engine(request):
@@ -486,11 +1041,11 @@ def toggle_resolution_engine(request):
                 model="gpt-4o-mini",
                 temperature=0.0
             )
-            processor = VideoSummarizationProcessor(enable_resolution=True, llm=llm)
+            processor = TextProcessor(enable_resolution=True, llm=llm)
             message = 'Graph resolution engine enabled'
         else:
             # Initialize processor without resolution
-            processor = VideoSummarizationProcessor(enable_resolution=False)
+            processor = TextProcessor(enable_resolution=False)
             message = 'Graph resolution engine disabled'
         
         # Test that processor works
