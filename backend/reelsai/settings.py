@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "apps.users",
     "apps.hashtag_crawling",
-    "django_extensions"
+    "django_extensions",
     "apps.graph",
     "apps.agents",
     "apps.chatbot",

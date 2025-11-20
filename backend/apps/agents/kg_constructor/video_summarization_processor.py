@@ -10,7 +10,16 @@ import logging
 from typing import Dict, Any, List
 from datetime import datetime
 from django.conf import settings
-from langchain_openai import ChatOpenAI
+# Use LangChain's chat model import (install `langchain` + `openai`)
+try:
+    # Preferred import (newer LangChain)
+    from langchain.chat_models import ChatOpenAI
+except Exception:
+    # Fallback for different packaging layouts
+    try:
+        from langchain.chat_models.openai import ChatOpenAI
+    except Exception:
+        ChatOpenAI = None
 
 from .kg_constructor import run_knowledge_graph_pipeline
 from .neo4j_client import Neo4jClient
@@ -34,11 +43,17 @@ class VideoSummarizationProcessor:
             enable_resolution: Whether to enable graph resolution for duplicates
         """
         # Initialize LLM first
-        self.llm = llm or ChatOpenAI(
-            api_key=getattr(settings, 'OPENAI_API_KEY', ''),
-            model="gpt-4o-mini",
-            temperature=0.0
-        )
+        if llm:
+            self.llm = llm
+        else:
+            if ChatOpenAI is None:
+                raise ImportError("ChatOpenAI not available in installed langchain package")
+            # Use explicit parameter names compatible with recent langchain versions
+            self.llm = ChatOpenAI(
+                model_name="gpt-4o-mini",
+                openai_api_key=getattr(settings, 'OPENAI_API_KEY', ''),
+                temperature=0.0,
+            )
         
         # Initialize Neo4j client with LLM for resolution
         self.neo4j_client = neo4j_client or Neo4jClient(llm=self.llm if enable_resolution else None)

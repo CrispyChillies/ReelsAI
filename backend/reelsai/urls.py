@@ -31,12 +31,8 @@ urlpatterns = [
     path("api/auth/", include("apps.users.urls")),
     path('api/', include('apps.hashtag_crawling.urls')),
     path('api/', include('apps.video_tiktok.urls')),
-    path("api/graph/", include("apps.graph.urls")),
-    path("api/chat/", include("apps.chatbot.urls")),
-
-    # Swagger UI endpoints
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]
 
 # Serve media files during development
