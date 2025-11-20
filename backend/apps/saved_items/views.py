@@ -1,5 +1,6 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_spectacular.utils import extend_schema, OpenApiExample
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ SAVE_ITEM_EXAMPLE = OpenApiExample(
     description="Save a video item for a user and queue it for processing (summary + RAG + KG)",
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def save_item_view(request):
     """
     API endpoint to save a video item for a user.

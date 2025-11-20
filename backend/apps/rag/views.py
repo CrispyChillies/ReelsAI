@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -60,6 +61,7 @@ QUERY_ITEMS_EXAMPLE = OpenApiExample(
     description="Add an item to RAG system. Timestamp is optional - if not provided, current timestamp will be used.",
 )
 @api_view(["PUT"])
+@permission_classes([IsAuthenticated])
 def add_item_view(request):
     """
     Add a single item to the RAG system.
@@ -123,6 +125,7 @@ def add_item_view(request):
     description="Query items using semantic search with optional filters (timestamp, platform).",
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def query_items_view(request):
     """
     Query items from RAG system using semantic search.
