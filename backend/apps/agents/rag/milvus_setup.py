@@ -25,7 +25,6 @@ if COLLECTION_NAME not in utility.list_collections():
         FieldSchema(name="user_id", dtype=DataType.VARCHAR, max_length=64),
         FieldSchema(name="platform", dtype=DataType.VARCHAR, max_length=20),
         FieldSchema(name="summary", dtype=DataType.VARCHAR, max_length=4000),
-        FieldSchema(name="timestamp", dtype=DataType.INT64),
         FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768),
     ]
 

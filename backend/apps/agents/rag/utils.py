@@ -46,7 +46,11 @@ def _build_columns_for_insert(data_map: Dict[str, Any]) -> List[List[Any]]:
 
 
 def insert_item(
-    content_id: str, user_id: str, platform: str, summary: str, timestamp: int
+    content_id: str,
+    user_id: str,
+    platform: str,
+    summary: str,
+    timestamp: Optional[int] = None,
 ):
     if collection is None or model is None:
         raise RuntimeError("Dependencies missing: model or collection")
@@ -57,9 +61,13 @@ def insert_item(
         "user_id": user_id,
         "platform": platform,
         "summary": summary,
-        "timestamp": timestamp,
         "embedding": embedding,
     }
+
+    # Only add timestamp if it exists in schema
+    # (kept for backwards compatibility if you re-add it later)
+    # if timestamp is not None:
+    #     values_map["timestamp"] = timestamp
 
     columns = _build_columns_for_insert(values_map)
     collection.insert(columns)
@@ -71,7 +79,7 @@ def query_items(
     user_id: str,
     query: str,
     top_k: int = 5,
-    from_timestamp: Optional[int] = None,
+    # from_timestamp: Optional[int] = None,
     platform: Optional[str] = None,
 ) -> Dict[str, Any]:
     if collection is None or model is None:
@@ -79,8 +87,8 @@ def query_items(
 
     query_vec = model.encode(query).tolist()
     expr_parts = [f"user_id == '{user_id}'"]
-    if from_timestamp:
-        expr_parts.append(f"timestamp >= {from_timestamp}")
+    # if from_timestamp:
+    #     expr_parts.append(f"timestamp >= {from_timestamp}")
     if platform:
         expr_parts.append(f"platform == '{platform}'")
     expr = " && ".join(expr_parts)
@@ -92,7 +100,7 @@ def query_items(
         param=search_params,
         limit=top_k,
         expr=expr,
-        output_fields=["content_id", "summary", "platform", "timestamp"],
+        output_fields=["content_id", "summary", "platform"],
     )
 
     hits = []

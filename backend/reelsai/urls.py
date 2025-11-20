@@ -28,7 +28,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.users.urls")),
     path("api/graph/", include("apps.graph.urls")),
-    path("api/chat/", include("apps.chatbot.urls")),
+    # path("api/chat/", include("apps.chatbot.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",
@@ -36,6 +36,8 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("api/rag/", include("apps.rag.urls")),
+    path("api/video-analysis/", include("apps.video_understanding.urls")),
+    path("api/v1/", include("apps.saved_items.urls")),
 ]
 
 # Serve media files during development
