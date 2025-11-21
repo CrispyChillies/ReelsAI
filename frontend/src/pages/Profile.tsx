@@ -1,13 +1,11 @@
 import styled from "styled-components";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/app/i18n";
 import PwField from "@/components/common/inputs/PwField";
-import TopicIcon from "@/components/common/TopicIcon";
-// COMMENTED OUT: Backend API calls
-// import { getProfile, updateProfile, changePassword } from "@/services/profile";
-// import { logout } from "@/services/auth";
 import { useToast } from "@/app/toast";
-import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import LoaderPage from "@/components/common/loaders/LoaderPage";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 
@@ -19,162 +17,13 @@ type ProfileForm = {
 };
 type PwForm = { current: string; next: string; confirm: string };
 
-const ISO_FMT = "YYYY-MM-DD";
-const DISP_FMT = "DD/MM/YYYY";
-const MIN_AGE = 14;
-const MAX_AGE = 100;
-
-/* ===== Date helpers ===== */
-function isoToDisplay(iso: string) {
-  if (!iso) return "";
-  const d = dayjs(iso, ISO_FMT, true);
-  return d.isValid() ? d.format(DISP_FMT) : "";
-}
-function displayToIso(display: string) {
-  const d = dayjs(display, DISP_FMT, true);
-  return d.isValid()
-    ? { iso: d.format(ISO_FMT), valid: true }
-    : { iso: "", valid: false };
-}
-
 /* ===== DateField ===== */
-function DateField({
-  label,
-  valueISO,
-  disabled,
-  onCommitISO,
-  placeholder = DISP_FMT,
-  invalidText,
-  pickLabel,
-}: {
-  label: string;
-  valueISO: string;
-  disabled?: boolean;
-  onCommitISO: (nextISO: string) => void;
-  placeholder?: string;
-  invalidText: string;
-  pickLabel: string;
-}) {
-  const [display, setDisplay] = useState<string>(isoToDisplay(valueISO));
-  const [invalid, setInvalid] = useState(false);
-  const nativeRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setDisplay(isoToDisplay(valueISO));
-    setInvalid(false);
-  }, [valueISO]);
-
-  const onChangeText = (v: string) => {
-    const cleaned = v.replace(/[^\d/]/g, "");
-    setDisplay(cleaned);
-    setInvalid(cleaned.length >= 8 ? !displayToIso(cleaned).valid : false);
-  };
-  const onBlurText = () => {
-    if (!display) {
-      onCommitISO("");
-      setInvalid(false);
-      return;
-    }
-    const parsed = displayToIso(display);
-    if (parsed.valid) {
-      onCommitISO(parsed.iso);
-      setDisplay(isoToDisplay(parsed.iso));
-      setInvalid(false);
-    } else setInvalid(true);
-  };
-  const openNativePicker = () => {
-    if (disabled) return;
-    const el = nativeRef.current;
-    if (!el) return;
-    try {
-      if (typeof el.showPicker === "function") el.showPicker();
-      else {
-        el.focus();
-        el.click();
-      }
-    } catch {
-      el.focus();
-      el.click();
-    }
-  };
-  const onNativeChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const iso = e.target.value;
-    onCommitISO(iso);
-    setDisplay(isoToDisplay(iso));
-    setInvalid(false);
-  };
-
-  return (
-    <label>
-      <div className="lbl">{label}</div>
-      <div className="dateField">
-        <input
-          type="text"
-          inputMode="numeric"
-          placeholder={placeholder}
-          disabled={disabled}
-          value={display}
-          onChange={(e) => onChangeText(e.target.value)}
-          onBlur={onBlurText}
-          aria-invalid={invalid ? "true" : "false"}
-        />
-        <input
-          ref={nativeRef}
-          className="native"
-          type="date"
-          value={valueISO || ""}
-          onChange={onNativeChange}
-          disabled={disabled}
-        />
-        <button
-          type="button"
-          className="calendarBtn"
-          onClick={openNativePicker}
-          aria-label={pickLabel}
-          title={pickLabel}
-          disabled={disabled}
-        >
-          {calendarSvg}
-        </button>
-      </div>
-      {invalid && (
-        <div className="msg error small">
-          {invalidText} {DISP_FMT} (09/02/2001)
-        </div>
-      )}
-    </label>
-  );
-}
-const calendarSvg = (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-    <rect
-      x="3"
-      y="4"
-      width="18"
-      height="17"
-      rx="2"
-      ry="2"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2" />
-    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2" />
-    <line
-      x1="3"
-      y1="10"
-      x2="21"
-      y2="10"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-  </svg>
-);
 
 export default function Profile() {
   const { t } = useI18n();
   const { notify } = useToast();
-  // const nav = useNavigate();
+  const { user, isLoadingUser } = useAuth();
+  const { updateProfile, isUpdatingProfile, changePassword, isChangingPassword } = useProfile();
 
   const initial: ProfileForm = {
     name: "",
@@ -185,14 +34,8 @@ export default function Profile() {
   const [editing, setEditing] = useState(false);
 
   const [pw, setPw] = useState<PwForm>({ current: "", next: "", confirm: "" });
-  const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSuccess, setPwSuccess] = useState<string | null>(null);
-
-  // COMMENTED OUT: Topics feature no longer needed
-  // const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  // const [backupTopics, setBackupTopics] = useState<string[]>([]);
-  // const [editingTopics, setEditingTopics] = useState(false);
 
   // tự ẩn msg pw sau 4s
   useEffect(() => {
@@ -204,36 +47,23 @@ export default function Profile() {
     return () => clearTimeout(id);
   }, [pwError, pwSuccess]);
 
-  // DEMO: Load mock profile data (no backend)
+  // Load user profile from useAuth
   useEffect(() => {
-    // Simulate loading profile from localStorage or use demo data
-    const mockProfile: ProfileForm = {
-      name: "DemoUser",
-      email: "demo@example.com",
-    };
-    setForm(mockProfile);
-    setBackup(mockProfile);
-    
-    // COMMENTED OUT: Topics loading no longer needed
-    // const savedTopics = localStorage.getItem("userTopics");
-    // if (savedTopics) {
-    //   const topics = JSON.parse(savedTopics);
-    //   setSelectedTopics(topics);
-    //   setBackupTopics(topics);
-    // }
-  }, []);
+    if (user) {
+      const profileData: ProfileForm = {
+        name: user.username || "",
+        email: user.email || "",
+      };
+      setForm(profileData);
+      setBackup(profileData);
+    }
+  }, [user]);
 
-  // COMMENTED OUT: Real backend profile loading
-  // useEffect(() => {
-  //   (async () => {
-  //     try {
-  //       const p = await getProfile();
-  //       const pf: ProfileForm = {
-  //         name: p.name || "",
-  //         age: p.age != null ? String(p.age) : "",
-  //         city: p.city || "",
-  //         email: p.email || "",
-  //         phone: p.phone || "",
+  if (isLoadingUser) {
+    return <LoaderPage />;
+  }
+
+  // ========== handlers ==========
   //         dob: p.dob || "",
   //       };
   //       setForm(pf);
@@ -275,51 +105,19 @@ export default function Profile() {
       return;
     }
 
-    // DEMO: Save to localStorage instead of backend
-    try {
-      localStorage.setItem("demo-profile", JSON.stringify(form));
-      setBackup(form);
-      setEditing(false);
-      notify({ title: "Demo", content: "Profile saved to localStorage", tone: "success" });
-      window.dispatchEvent(new Event("profile-updated"));
-    } catch (e: any) {
-      notify({
-        title: t("error"),
-        content: "Error saving profile",
-        tone: "error",
-      });
-    }
-
-    // COMMENTED OUT: Real backend save
-    // try {
-    //   const patch = {
-    //     name: form.name || null,
-    //     age: ageNum ?? null,
-    //     city: form.city || null,
-    //     phone: form.phone || null,
-    //     dob: form.dob || null,
-    //   };
-    //   const updated = await updateProfile(patch);
-    //   const pf: ProfileForm = {
-    //     name: updated.name || "",
-    //     age: updated.age != null ? String(updated.age) : "",
-    //     city: updated.city || "",
-    //     email: updated.email || "",
-    //     phone: updated.phone || "",
-    //     dob: updated.dob || "",
-    //   };
-    //   setForm(pf);
-    //   setBackup(pf);
-    //   setEditing(false);
-    //   notify({ title: t("saved"), tone: "success" });
-    //   window.dispatchEvent(new Event("profile-updated"));
-    // } catch (e: any) {
-    //   notify({
-    //     title: t("error"),
-    //     content: e?.response?.data?.detail || e?.message,
-    //     tone: "error",
-    //   });
-    // }
+    // Call API to update profile
+    updateProfile(
+      {
+        username: form.name.trim(),
+        email: form.email.trim(),
+      },
+      {
+        onSuccess: () => {
+          setBackup(form);
+          setEditing(false);
+        },
+      }
+    );
   };
 
   const onChangePw = async () => {
@@ -342,34 +140,24 @@ export default function Profile() {
       return;
     }
 
-    // DEMO: Simulate password change (no backend)
-    setPwLoading(true);
-    setTimeout(() => {
-      setPwSuccess("Demo: Password change simulated successfully");
-      setPw({ current: "", next: "", confirm: "" });
-      setPwLoading(false);
-    }, 1000);
-
-    // COMMENTED OUT: Real backend password change
-    // setPwLoading(true);
-    // try {
-    //   await changePassword(pw.current, pw.next);
-    //   setPwSuccess(t("passwordUpdated"));
-    //   setPw({ current: "", next: "", confirm: "" });
-    //   setTimeout(async () => {
-    //     try {
-    //       await logout();
-    //     } finally {
-    //       nav("/signin", { replace: true });
-    //     }
-    //   }, 2500);
-    // } catch (e: any) {
-    //   setPwError(
-    //     e?.response?.data?.detail || e?.message || t("passwordUpdateFailed")
-    //   );
-    // } finally {
-    //   setPwLoading(false);
-    // }
+    // Call API to change password
+    changePassword(
+      {
+        current_password: pw.current,
+        new_password: pw.next,
+      },
+      {
+        onSuccess: () => {
+          setPwSuccess(t("passwordUpdated"));
+          setPw({ current: "", next: "", confirm: "" });
+        },
+        onError: (error: any) => {
+          setPwError(
+            error?.response?.data?.error || error?.message || t("passwordUpdateFailed")
+          );
+        },
+      }
+    );
   };
 
   // COMMENTED OUT: Topics feature no longer needed
@@ -454,8 +242,12 @@ export default function Profile() {
                 <button className="btn ghost" onClick={cancelEdit}>
                   {t("cancel")}
                 </button>
-                <button className="btn accent" onClick={save}>
-                  {t("save")}
+                <button 
+                  className="btn accent" 
+                  onClick={save}
+                  disabled={isUpdatingProfile}
+                >
+                  {isUpdatingProfile ? t("saving") : t("save")}
                 </button>
               </>
             )}
@@ -576,9 +368,9 @@ export default function Profile() {
           <button
             className="btn accent"
             onClick={onChangePw}
-            disabled={pwLoading}
+            disabled={isChangingPassword}
           >
-            {pwLoading ? t("updating") : t("updatePassword")}
+            {isChangingPassword ? t("updating") : t("updatePassword")}
           </button>
         </div>
       </div>
