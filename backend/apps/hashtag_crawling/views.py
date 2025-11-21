@@ -37,12 +37,12 @@ class GetTopHashtagsView(APIView):
             response = supabase.table("hashtags").select("*").eq("industry_id", industry_id).range(0, 100).execute()
             hashtags = response.data
 
-            # Filter hashtags by country
+            # Lọc hashtags theo quốc gia
             vietnam_hashtags = [h for h in hashtags if h['country_id'] == 'VN']
             us_hashtags = [h for h in hashtags if h['country_id'] == 'US']
             uk_hashtags = [h for h in hashtags if h['country_id'] == 'GB']
 
-            # Sort by views (descending) and limit results
+            # Sắp xếp theo lượt xem và giới hạn kết quả
             vietnam_hashtags = sorted(vietnam_hashtags, key=lambda x: x['views'], reverse=True)[:10]
             us_hashtags = sorted(us_hashtags, key=lambda x: x['views'], reverse=True)[:10]
             uk_hashtags = sorted(uk_hashtags, key=lambda x: x['views'], reverse=True)[:10]

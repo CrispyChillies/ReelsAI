@@ -38,7 +38,7 @@ class GetVideosByIndustryView(APIView):
             if not industry_id.isdigit():
                 return JsonResponse({"error": "industry_id is required and must be an integer"}, status=400)
 
-            # --- BƯỚC 1: Lấy và lọc Hashtag ---
+            # Lấy và lọc Hashtag ---
             api_url = f"http://127.0.0.1:8000/api/top-hashtags/?industry_id={industry_id}"
             user_token = request.auth 
             headers = {"Authorization": f"Bearer {user_token}"}
@@ -65,7 +65,7 @@ class GetVideosByIndustryView(APIView):
             except requests.exceptions.RequestException as e:
                 return JsonResponse({"error": f"Failed to fetch hashtags: {str(e)}"}, status=500)
 
-            # --- BƯỚC 2: Tìm kiếm theo Batch ---
+            # Tìm kiếm theo Batch
             found_videos_map = {}
             BATCH_SIZE = 3
             MAX_VIDEOS = 5
@@ -109,7 +109,7 @@ class GetVideosByIndustryView(APIView):
 
             result.sort(key=lambda x: int(x.get('play_count') or 0), reverse=True)
 
-            # Lấy 5 video đầu tiên (cao nhất)
+            # Lấy 5 video có lượt xem cao nhất
             result = result[:MAX_VIDEOS]
 
             return JsonResponse(result, safe=False)
