@@ -85,7 +85,7 @@ const MOCK_POSTS = [
 ];
 
 export default function NewsfeedPage() {
-  const { t } = useI18n();
+  useI18n();
   const [promptValue, setPromptValue] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [posts] = useState(MOCK_POSTS);
@@ -385,15 +385,6 @@ const ActiveFilterBox = styled.div`
   }
 `;
 
-const FilterLabel = styled.span`
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: ${({ theme }) => theme.colors.accent};
-  flex-shrink: 0;
-  padding-top: 2px;
-`;
 
 const FilterText = styled.span`
   flex: 1;

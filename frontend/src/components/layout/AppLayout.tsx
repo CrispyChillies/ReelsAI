@@ -1,22 +1,12 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import Sidebar from "@/components/layout/Sidebar";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useI18n } from "@/app/i18n";
-// COMMENTED OUT: Profile banner feature removed
-// import { getProfile } from "@/services/profile";
-// import { me } from "@/services/auth"; 
-
-type ProfileLite = {
-  name?: string | null;
-  age?: number | null;
-  city?: string | null;
-};
 
 export default function AppLayout() {
-  const { t, lang } = useI18n();
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
+  useI18n();
+  useLocation();
 
   const [collapsed, setCollapsed] = useState(false);
   // COMMENTED OUT: Banner feature removed
