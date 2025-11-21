@@ -6,12 +6,19 @@ from pymilvus import (
     DataType,
     utility,
 )
-from django.conf import settings
+import os
+from dotenv import load_dotenv
 
-# ========= CONFIG =========
-ZILLIZ_URI = settings.ZILLIZ_URI
-ZILLIZ_TOKEN = settings.ZILLIZ_TOKEN
-COLLECTION_NAME = settings.COLLECTION_NAME
+load_dotenv()
+# from django.conf import settings
+
+
+# # ========= CONFIG =========
+ZILLIZ_URI = os.getenv("ZILLIZ_URI")
+ZILLIZ_TOKEN = os.getenv("ZILLIZ_TOKEN")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME")
+
+# settings.configure()
 
 # ========= CONNECT =========
 connections.connect(alias="default", uri=ZILLIZ_URI, token=ZILLIZ_TOKEN)
@@ -25,6 +32,7 @@ if COLLECTION_NAME not in utility.list_collections():
         FieldSchema(name="user_id", dtype=DataType.VARCHAR, max_length=64),
         FieldSchema(name="platform", dtype=DataType.VARCHAR, max_length=20),
         FieldSchema(name="summary", dtype=DataType.VARCHAR, max_length=4000),
+        FieldSchema(name="timestamp", dtype=DataType.INT64),  # Unix timestamp
         FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768),
     ]
 
@@ -35,17 +43,13 @@ if COLLECTION_NAME not in utility.list_collections():
     print("🆕 Created collection:", COLLECTION_NAME)
 
     # Sử dụng chỉ mục IVF_FLAT, phù hợp cho kích thước 768 chiều
-    # nlist là tham số cấu hình, bạn có thể điều chỉnh sau
     index_params = {
         "index_type": "IVF_FLAT",
         "metric_type": "COSINE",
-        "params": {"nlist": 128},  # Có thể điều chỉnh
+        "params": {"nlist": 128},
     }
-    index_result = collection.create_index(
-        field_name="embedding", index_params=index_params
-    )
+    collection.create_index(field_name="embedding", index_params=index_params)
     print("✅ Created Index for 'embedding'")
-    print("🆕 Created collection:", COLLECTION_NAME)
 else:
     collection = Collection(COLLECTION_NAME)
     print("📁 Using existing collection:", COLLECTION_NAME)

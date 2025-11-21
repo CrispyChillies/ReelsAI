@@ -61,6 +61,7 @@ def insert_item(
         "user_id": user_id,
         "platform": platform,
         "summary": summary,
+        "timestamp": timestamp,
         "embedding": embedding,
     }
 
@@ -79,7 +80,7 @@ def query_items(
     user_id: str,
     query: str,
     top_k: int = 5,
-    # from_timestamp: Optional[int] = None,
+    from_timestamp: Optional[int] = None,
     platform: Optional[str] = None,
 ) -> Dict[str, Any]:
     if collection is None or model is None:
@@ -87,8 +88,8 @@ def query_items(
 
     query_vec = model.encode(query).tolist()
     expr_parts = [f"user_id == '{user_id}'"]
-    # if from_timestamp:
-    #     expr_parts.append(f"timestamp >= {from_timestamp}")
+    if from_timestamp:
+        expr_parts.append(f"timestamp >= {from_timestamp}")
     if platform:
         expr_parts.append(f"platform == '{platform}'")
     expr = " && ".join(expr_parts)

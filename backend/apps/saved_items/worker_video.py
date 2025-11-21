@@ -25,7 +25,7 @@ def process_job(user_id: int, content_id: int):
     try:
         # Step 1: Fetch media URL from Supabase
         resp = (
-            supabase.table("video_crawling")
+            supabase.table("content_crawling")
             .select("mediaUrls")
             .eq("id", content_id)
             .execute()
@@ -92,6 +92,7 @@ def process_job(user_id: int, content_id: int):
                     "user_id": str(user_id),
                     "summary": summary,
                     "platform": "tiktok",
+                    "timestamp": int(time.time()),
                 },
                 timeout=30,
             )

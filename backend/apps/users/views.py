@@ -16,7 +16,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import (
     extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 )
-
 from .serializers import *  # your existing serializer
 
 

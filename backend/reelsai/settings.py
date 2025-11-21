@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "apps.users",
+    "apps.hashtag_crawling",
+    "django_extensions",
     "apps.graph",
     "apps.agents",
     "apps.chatbot",
