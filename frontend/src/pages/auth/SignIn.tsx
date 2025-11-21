@@ -41,7 +41,7 @@ export default function SignIn() {
             <ThreeDBackground />
             <div className="content">
               <h1 className="brand">ReelsAI</h1>
-              <p className="tagline">Your AI-powered assistant for everything</p>
+              <p className="tagline">Your AI-powered assistant for Reels</p>
             </div>
           </div>
 

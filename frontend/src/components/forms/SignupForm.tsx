@@ -5,7 +5,7 @@ import Button from "@/components/common/buttons/Button";
 import PwField from "@/components/common/inputs/PwField";
 
 type Props = {
-  onSubmit: (p: { email: string; password: string; fullName: string }) => void;
+  onSubmit: (p: { email: string; password: string; username: string }) => void;
   loading?: boolean;
 };
 
@@ -22,7 +22,7 @@ const SignupForm: React.FC<Props> = ({ onSubmit, loading }) => {
       alert(`${t("error")}: ${t("confirmPassword")}`);
       return;
     }
-    onSubmit({ email: email.trim(), password: pw, fullName: name.trim() });
+    onSubmit({ email: email.trim(), password: pw, username: name.trim() });
   };
 
   return (
@@ -32,21 +32,21 @@ const SignupForm: React.FC<Props> = ({ onSubmit, loading }) => {
 
         <form className="form" onSubmit={submit}>
           <div className="input-box">
-            <label>{t("fullName")}</label>
+            <label>Username</label>
             <input
               required
-              placeholder={t("fullName")}
+              placeholder="Your username"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="input-box">
-            <label>{t("email")}</label>
+            <label>Email</label>
             <input
               required
               type="email"
-              placeholder="Email của bạn"
+              placeholder="Your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -54,14 +54,14 @@ const SignupForm: React.FC<Props> = ({ onSubmit, loading }) => {
 
           <div className="column">
             <PwField
-              label={t("password")}
+              label="Password"
               value={pw}
               onChange={setPw}
               autoComplete="new-password"
               required
             />
             <PwField
-              label={t("confirmPassword")}
+              label="Confirm Password"
               value={pw2}
               onChange={setPw2}
               autoComplete="new-password"
@@ -138,7 +138,7 @@ const StyledWrapper = styled.div`
   }
   .input-box input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
   }
 
   .form .column {

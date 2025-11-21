@@ -29,7 +29,7 @@ const ForgotForm: React.FC<Props> = ({ onSubmit, loading }) => {
             <input
               required
               type="email"
-              placeholder="Email của bạn"
+              placeholder="Your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -103,6 +103,6 @@ const StyledWrapper = styled.div`
   }
   .input-box input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
   }
 `;

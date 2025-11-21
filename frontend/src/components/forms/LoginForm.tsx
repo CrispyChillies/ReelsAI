@@ -5,12 +5,12 @@ import Button from "@/components/common/buttons/Button";
 import PwField from "@/components/common/inputs/PwField";
 
 type Props = {
-  onSubmit: (email: string, password: string) => void;
+  onSubmit: (username: string, password: string) => void;
   loading?: boolean;
 };
 
 const LoginForm: React.FC<Props> = ({ onSubmit, loading }) => {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [pw, setPw] = useState("");
   const { t } = useI18n();
 
@@ -23,22 +23,22 @@ const LoginForm: React.FC<Props> = ({ onSubmit, loading }) => {
           className="form"
           onSubmit={(e) => {
             e.preventDefault();
-            onSubmit(email.trim(), pw);
+            onSubmit(username.trim(), pw);
           }}
         >
           <div className="input-box">
-            <label>{t("email")}</label>
+            <label>Username</label>
             <input
               required
-              placeholder="Email của bạn"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
           <PwField
-            label={t("password")}
+            label="Password"
             value={pw}
             onChange={setPw}
             autoComplete="current-password"
@@ -113,6 +113,6 @@ const StyledWrapper = styled.div`
   }
   .input-box input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
   }
 `;

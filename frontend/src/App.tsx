@@ -5,7 +5,7 @@ import SignUp from "@/pages/auth/SignUp";
 import Forgot from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import CheckEmailPage from "./pages/auth/CheckEmailPage";
-import OnboardingTopics from "@/pages/OnboardingTopics";
+// import OnboardingTopics from "@/pages/OnboardingTopics";
 
 import AppLayout from "@/components/layout/AppLayout";
 import NewsfeedPage from "@/pages/NewsfeedPage";
@@ -30,7 +30,7 @@ export default function App() {
       <Route path="/check-email" element={<CheckEmailPage />} />
 
       {/* ===== Onboarding ===== */}
-      <Route path="/onboarding/topics" element={<OnboardingTopics />} />
+      {/* <Route path="/onboarding/topics" element={<OnboardingTopics />} /> */}
 
       {/* ===== App routes with sidebar ===== */}
       <Route element={<AppLayout />}>

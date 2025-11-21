@@ -14,12 +14,8 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 
 type ProfileForm = {
-  name: string;
-  age: string;
-  city: string;
+  name: string; // Used as username
   email: string;
-  phone: string;
-  dob: string;
 };
 type PwForm = { current: string; next: string; confirm: string };
 
@@ -182,11 +178,7 @@ export default function Profile() {
 
   const initial: ProfileForm = {
     name: "",
-    age: "",
-    city: "",
     email: "",
-    phone: "",
-    dob: "",
   };
   const [form, setForm] = useState<ProfileForm>(initial);
   const [backup, setBackup] = useState<ProfileForm>(initial);
@@ -197,10 +189,10 @@ export default function Profile() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSuccess, setPwSuccess] = useState<string | null>(null);
 
-  // Topics state
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [backupTopics, setBackupTopics] = useState<string[]>([]);
-  const [editingTopics, setEditingTopics] = useState(false);
+  // COMMENTED OUT: Topics feature no longer needed
+  // const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  // const [backupTopics, setBackupTopics] = useState<string[]>([]);
+  // const [editingTopics, setEditingTopics] = useState(false);
 
   // tự ẩn msg pw sau 4s
   useEffect(() => {
@@ -216,23 +208,19 @@ export default function Profile() {
   useEffect(() => {
     // Simulate loading profile from localStorage or use demo data
     const mockProfile: ProfileForm = {
-      name: "Demo User",
-      age: "25",
-      city: "Hanoi",
+      name: "DemoUser",
       email: "demo@example.com",
-      phone: "0123456789",
-      dob: "2000-01-15",
     };
     setForm(mockProfile);
     setBackup(mockProfile);
     
-    // Load topics from localStorage
-    const savedTopics = localStorage.getItem("userTopics");
-    if (savedTopics) {
-      const topics = JSON.parse(savedTopics);
-      setSelectedTopics(topics);
-      setBackupTopics(topics);
-    }
+    // COMMENTED OUT: Topics loading no longer needed
+    // const savedTopics = localStorage.getItem("userTopics");
+    // if (savedTopics) {
+    //   const topics = JSON.parse(savedTopics);
+    //   setSelectedTopics(topics);
+    //   setBackupTopics(topics);
+    // }
   }, []);
 
   // COMMENTED OUT: Real backend profile loading
@@ -272,61 +260,13 @@ export default function Profile() {
   };
 
   const hasDiff = (a: ProfileForm, b: ProfileForm) =>
-    a.name !== b.name ||
-    a.age !== b.age ||
-    a.city !== b.city ||
-    a.phone !== b.phone ||
-    a.dob !== b.dob;
+    a.name !== b.name;
 
   const save = async () => {
     // ===== Required fields =====
     if (!form.name.trim()) {
-      notify({ title: t("error"), content: t("requireName"), tone: "error" });
+      notify({ title: t("error"), content: "Username is required", tone: "error" });
       return;
-    }
-    if (!form.age.trim()) {
-      notify({ title: t("error"), content: t("requireAge"), tone: "error" });
-      return;
-    }
-    if (!form.city.trim()) {
-      notify({ title: t("error"), content: t("requireCity"), tone: "error" });
-      return;
-    }
-
-    // ===== validations =====
-    const ageNum = form.age ? Number(form.age) : null;
-    if (form.age && (Number.isNaN(ageNum) || !Number.isInteger(ageNum))) {
-      notify({ title: t("error"), content: t("ageInteger"), tone: "error" });
-      return;
-    }
-    if (ageNum !== null && (ageNum < MIN_AGE || ageNum > MAX_AGE)) {
-      notify({ title: t("error"), content: t("ageRange"), tone: "error" });
-      return;
-    }
-
-    if (form.dob) {
-      const dob = dayjs(form.dob, ISO_FMT, true);
-      if (!dob.isValid()) {
-        notify({ title: t("error"), content: t("dobInvalid"), tone: "error" });
-        return;
-      }
-      if (dob.isAfter(dayjs(), "day")) {
-        notify({ title: t("error"), content: t("dobFuture"), tone: "error" });
-        return;
-      }
-      const calcAge = dayjs().diff(dob, "year");
-      if (calcAge < MIN_AGE || calcAge > MAX_AGE) {
-        notify({ title: t("error"), content: t("ageRange"), tone: "error" });
-        return;
-      }
-      if (ageNum !== null && ageNum !== calcAge) {
-        notify({
-          title: t("error"),
-          content: t("ageDobMismatch"),
-          tone: "error",
-        });
-        return;
-      }
     }
 
     if (!hasDiff(form, backup)) {
@@ -432,67 +372,67 @@ export default function Profile() {
     // }
   };
 
-  // Topics handlers
-  const TOPICS = [
-    { id: "animals", labelKey: "topicAnimals" },
-    { id: "anime", labelKey: "topicAnime" },
-    { id: "art", labelKey: "topicArt" },
-    { id: "beauty", labelKey: "topicBeauty" },
-    { id: "books", labelKey: "topicBooks" },
-    { id: "business", labelKey: "topicBusiness" },
-    { id: "dance", labelKey: "topicDance" },
-    { id: "education", labelKey: "topicEducation" },
-    { id: "entertainment", labelKey: "topicEntertainment" },
-    { id: "fashion", labelKey: "topicFashion" },
-    { id: "food", labelKey: "topicFood" },
-    { id: "gaming", labelKey: "topicGaming" },
-    { id: "health", labelKey: "topicHealth" },
-    { id: "lifestyle", labelKey: "topicLifestyle" },
-    { id: "music", labelKey: "topicMusic" },
-    { id: "personal", labelKey: "topicPersonal" },
-    { id: "photography", labelKey: "topicPhotography" },
-    { id: "sports", labelKey: "topicSports" },
-    { id: "tech", labelKey: "topicTech" },
-    { id: "travel", labelKey: "topicTravel" },
-    { id: "other", labelKey: "topicOther" },
-  ];
+  // COMMENTED OUT: Topics feature no longer needed
+  // const TOPICS = [
+  //   { id: "animals", labelKey: "topicAnimals" },
+  //   { id: "anime", labelKey: "topicAnime" },
+  //   { id: "art", labelKey: "topicArt" },
+  //   { id: "beauty", labelKey: "topicBeauty" },
+  //   { id: "books", labelKey: "topicBooks" },
+  //   { id: "business", labelKey: "topicBusiness" },
+  //   { id: "dance", labelKey: "topicDance" },
+  //   { id: "education", labelKey: "topicEducation" },
+  //   { id: "entertainment", labelKey: "topicEntertainment" },
+  //   { id: "fashion", labelKey: "topicFashion" },
+  //   { id: "food", labelKey: "topicFood" },
+  //   { id: "gaming", labelKey: "topicGaming" },
+  //   { id: "health", labelKey: "topicHealth" },
+  //   { id: "lifestyle", labelKey: "topicLifestyle" },
+  //   { id: "music", labelKey: "topicMusic" },
+  //   { id: "personal", labelKey: "topicPersonal" },
+  //   { id: "photography", labelKey: "topicPhotography" },
+  //   { id: "sports", labelKey: "topicSports" },
+  //   { id: "tech", labelKey: "topicTech" },
+  //   { id: "travel", labelKey: "topicTravel" },
+  //   { id: "other", labelKey: "topicOther" },
+  // ];
 
-  const toggleTopic = (topicId: string) => {
-    if (!editingTopics) return;
-    
-    setSelectedTopics((prev) => {
-      if (prev.includes(topicId)) {
-        // Unselect
-        return prev.filter((id) => id !== topicId);
-      } else {
-        // Select (only if < 5)
-        if (prev.length >= 5) return prev;
-        return [...prev, topicId];
-      }
-    });
-  };
+  // const toggleTopic = (topicId: string) => {
+  //   if (!editingTopics) return;
+  //   
+  //   setSelectedTopics((prev) => {
+  //     if (prev.includes(topicId)) {
+  //       // Unselect
+  //       return prev.filter((id) => id !== topicId);
+  //     } else {
+  //       // Select (only if < 5)
+  //       if (prev.length >= 5) return prev;
+  //       return [...prev, topicId];
+  //     }
+  //   });
+  // };
 
-  const startEditTopics = () => {
-    setBackupTopics(selectedTopics);
-    setEditingTopics(true);
-  };
+  // const startEditTopics = () => {
+  //   setBackupTopics(selectedTopics);
+  //   setEditingTopics(true);
+  // };
 
-  const cancelEditTopics = () => {
-    setSelectedTopics(backupTopics);
-    setEditingTopics(false);
-  };
+  // const cancelEditTopics = () => {
+  //   setSelectedTopics(backupTopics);
+  //   setEditingTopics(false);
+  // };
 
-  const saveTopics = () => {
-    // Save to localStorage
-    localStorage.setItem("userTopics", JSON.stringify(selectedTopics));
-    setBackupTopics(selectedTopics);
-    setEditingTopics(false);
-    notify({
-      title: t("saved"),
-      content: t("topicsSaved"),
-      tone: "success",
-    });
-  };
+  // const saveTopics = () => {
+  //   // Save to localStorage
+  //   localStorage.setItem("userTopics", JSON.stringify(selectedTopics));
+  //   setBackupTopics(selectedTopics);
+  //   setEditingTopics(false);
+  //   notify({
+  //     title: t("saved"),
+  //     content: t("topicsSaved"),
+  //     tone: "success",
+  //   });
+  // };
 
   return (
     <Wrap>
@@ -525,7 +465,7 @@ export default function Profile() {
         <div className="grid">
           <label>
             <div className="lbl">
-              <span>{t("fullName")}</span>
+              <span>Username</span>
               <span className="req" aria-hidden="true">
                 *
               </span>
@@ -535,42 +475,7 @@ export default function Profile() {
               disabled={!editing}
               value={form.name}
               onChange={(e) => onChange("name", e.target.value)}
-              placeholder="Họ tên của bạn"
-            />
-          </label>
-
-          <label>
-            <div className="lbl">
-              <span>{t("age")}</span>
-              <span className="req" aria-hidden="true">
-                *
-              </span>
-            </div>
-            <input
-              aria-required="true"
-              disabled={!editing}
-              inputMode="numeric"
-              value={form.age}
-              onChange={(e) =>
-                onChange("age", e.target.value.replace(/[^\d]/g, ""))
-              }
-              placeholder="Tuổi của bạn"
-            />
-          </label>
-
-          <label>
-            <div className="lbl">
-              <span>{t("city")}</span>
-              <span className="req" aria-hidden="true">
-                *
-              </span>
-            </div>
-            <input
-              aria-required="true"
-              disabled={!editing}
-              value={form.city}
-              onChange={(e) => onChange("city", e.target.value)}
-              placeholder="Nơi ở của bạn"
+              placeholder="Your username"
             />
           </label>
 
@@ -578,36 +483,11 @@ export default function Profile() {
             <div className="lbl">{t("email")}</div>
             <input disabled type="email" value={form.email} readOnly />
           </label>
-
-          <label>
-            <div className="lbl">{t("phone")}</div>
-            <input
-              disabled={!editing}
-              inputMode="tel"
-              value={form.phone}
-              onChange={(e) =>
-                onChange(
-                  "phone",
-                  e.target.value.replace(/[^\d+]/g, "").replace(/\s+/g, "")
-                )
-              }
-              placeholder="Số điện thoại của bạn"
-            />
-          </label>
-
-          <DateField
-            label={(<div className="lbl">{t("dob")}</div>) as unknown as string}
-            valueISO={form.dob}
-            disabled={!editing}
-            onCommitISO={(iso) => onChange("dob", iso)}
-            invalidText={t("invalidDateLead")}
-            pickLabel={t("pickDate")}
-          />
         </div>
       </div>
 
-      {/* ======= Card: Chủ đề yêu thích ======= */}
-      <div className="card">
+      {/* COMMENTED OUT: Topics section no longer needed */}
+      {/* <div className="card">
         <div className="cardHead">
           <div className="title">
             <h2>{t("topicsTitle")}</h2>
@@ -658,7 +538,7 @@ export default function Profile() {
             {t("topicsSelected")} {selectedTopics.length}{t("topicsOf")}5 {t("topicsMax")}
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* ======= Card: Đổi mật khẩu ======= */}
       <div className="card">

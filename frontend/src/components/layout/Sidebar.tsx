@@ -318,7 +318,7 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     <Wrap data-collapsed={collapsed ? "true" : "false"} $bg={SIDEBAR_BG}>
       {/* Header */}
       <div className="head">
-        <button className="logo" onClick={go("/")} aria-label="Home">
+        <button className="logo" onClick={go("/app")} aria-label="Home">
           <img src={LOGO} alt="Logo" className="logo-img" />
           <span className="brand-name">ReelsAI</span>
         </button>

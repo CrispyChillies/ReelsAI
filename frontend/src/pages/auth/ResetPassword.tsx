@@ -162,7 +162,7 @@ const Wrap = styled.div<{ $bg: string }>`
     text-align: center;
     font-weight: 700;
     font-size: 1.2rem;
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.accent};
   }
   .form {
     margin-top: 16px;

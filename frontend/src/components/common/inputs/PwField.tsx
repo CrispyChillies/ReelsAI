@@ -18,7 +18,7 @@ const PwField: React.FC<Props> = ({
   label,
   value,
   onChange,
-  placeholder = "Nhập mật khẩu",
+  placeholder = "Enter password",
   autoComplete,
   required,
   disabled,
@@ -95,7 +95,7 @@ const Wrap = styled.div`
   }
   input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
   }
   input:disabled {
     background: ${({ theme }) => theme.colors.surface2};
@@ -120,10 +120,10 @@ const Wrap = styled.div`
   }
   .toggle:hover {
     color: ${({ theme }) => theme.colors.accent};
-    background: #fff5ef;
+    background: rgba(13, 148, 136, 0.1);
   }
   .toggle:focus-visible {
-    outline: 3px solid rgba(206, 122, 88, 0.35);
+    outline: 3px solid rgba(13, 148, 136, 0.35);
     outline-offset: 2px;
   }
   .toggle svg {

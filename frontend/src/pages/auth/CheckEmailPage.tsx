@@ -73,7 +73,7 @@ const Wrap = styled.div<{ $bg: string }>`
     text-align: center;
   }
 
-  .title { font-size: 1.2rem; font-weight: 700; margin: 0; color: ${({ theme }) => theme.colors.primary}; }
+  .title { font-size: 1.2rem; font-weight: 700; margin: 0; color: ${({ theme }) => theme.colors.accent}; }
   .desc { margin: 12px 0 18px; opacity: 0.9; }
 
   .btn-link { display: block; width: 100%; margin-bottom: 14px; }

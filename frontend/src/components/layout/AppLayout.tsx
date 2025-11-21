@@ -21,12 +21,13 @@ export default function AppLayout() {
   const [needProfile, setNeedProfile] = useState(false);
 
   /* ====== Onboarding check ====== */
-  useEffect(() => {
-    const onboardingCompleted = localStorage.getItem("onboardingCompleted");
-    if (!onboardingCompleted) {
-      navigate("/onboarding/topics", { replace: true });
-    }
-  }, [navigate]);
+  // COMMENTED OUT: No longer requiring onboarding flow
+  // useEffect(() => {
+  //   const onboardingCompleted = localStorage.getItem("onboardingCompleted");
+  //   if (!onboardingCompleted) {
+  //     navigate("/onboarding/topics", { replace: true });
+  //   }
+  // }, [navigate]);
 
   /* ====== Guard ====== */
   // COMMENTED OUT: Auth guard - no longer checking authentication or redirecting to signin
@@ -135,16 +136,11 @@ export default function AppLayout() {
       </aside>
 
       <section className="main">
-        {/* <Topbar>
-          <div className="chrome">
-            <button className="menuBtn" onClick={toggle} aria-label="Menu">
-              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none">
-                <path d="M3 6h18M3 12h18M3 18h18" strokeWidth="2"/>
-              </svg>
-            </button>
-            <div className="title">{t("appTitle")}</div>
-          </div>
-        </Topbar> */}
+        <MobileMenuButton onClick={toggle} aria-label="Menu" className="mobile-menu-btn">
+          <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18M3 12h18M3 18h18"/>
+          </svg>
+        </MobileMenuButton>
 
         {needProfile && (
           <Banner role="status" aria-live="polite">
@@ -173,6 +169,43 @@ export default function AppLayout() {
 }
 
 /* =============== styles =============== */
+const MobileMenuButton = styled.button`
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 4px 16px rgba(13, 148, 136, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(13, 148, 136, 0.12);
+  color: ${({ theme }) => theme.colors.accent};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: rgba(13, 148, 136, 0.05);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @media (min-width: 981px) {
+    display: none !important;
+  }
+`;
+
 const Shell = styled.div`
   --rail: 280px;
   --rail-collapsed: 68px;
@@ -184,8 +217,12 @@ const Shell = styled.div`
   grid-template-columns: var(--rail) 1fr;
   overflow: hidden;
 
+  /* Set CSS variable for sidebar width */
+  --sidebar-width: var(--rail);
+
   &[data-collapsed="true"] {
     grid-template-columns: var(--rail-collapsed) 1fr;
+    --sidebar-width: var(--rail-collapsed);
   }
 
   .rail {
@@ -216,13 +253,29 @@ const Shell = styled.div`
     padding-top: calc(var(--topbar-h) + var(--banner-h));
   }
 
+  /* Hide menu button on desktop */
+  @media (min-width: 981px) {
+    .mobile-menu-btn {
+      display: none !important;
+    }
+  }
+
   /* ===== MOBILE OVERLAY SIDEBAR ===== */
   @media (max-width: 980px) {
     /* grid 1 cột, không giữ cột rail rỗng */
     grid-template-columns: 1fr !important;
 
-    .content { padding-top: 0; }              /* banner sticky tự chiếm chỗ */
-    &[data-banner="1"] .content { padding-top: 0; }
+    .content { 
+      padding-top: 64px; /* Space for hamburger button */
+    }
+    &[data-banner="1"] .content { 
+      padding-top: 64px; /* Keep space even with banner */
+    }
+
+    /* Show menu button on mobile */
+    .mobile-menu-btn {
+      display: flex !important;
+    }
 
     .rail {
       display: none;
@@ -230,7 +283,7 @@ const Shell = styled.div`
       inset: 0 auto 0 0;
       width: min(86vw, 320px);
       max-width: 92vw;
-      z-index: 50;
+      z-index: 150;
       background: transparent;
       transform: translateX(-100%);
       transition: transform 0.28s ease, visibility 0s linear 0.28s;
@@ -250,7 +303,7 @@ const Shell = styled.div`
       content: "";
       position: fixed;
       inset: 0;
-      z-index: 40;
+      z-index: 140;
       background: rgba(0,0,0,0.25);
       backdrop-filter: blur(1px);
     }
