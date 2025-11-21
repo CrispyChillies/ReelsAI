@@ -3,7 +3,8 @@ import styled from "styled-components";
 import Sidebar from "@/components/layout/Sidebar";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "@/app/i18n";
-import { getProfile } from "@/services/profile";
+// COMMENTED OUT: Profile banner feature removed
+// import { getProfile } from "@/services/profile";
 // import { me } from "@/services/auth"; 
 
 type ProfileLite = {
@@ -18,7 +19,8 @@ export default function AppLayout() {
   const navigate = useNavigate();
 
   const [collapsed, setCollapsed] = useState(false);
-  const [needProfile, setNeedProfile] = useState(false);
+  // COMMENTED OUT: Banner feature removed
+  // const [needProfile, setNeedProfile] = useState(false);
 
   /* ====== Onboarding check ====== */
   // COMMENTED OUT: No longer requiring onboarding flow
@@ -69,67 +71,67 @@ export default function AppLayout() {
     });
 
   /* ====== Banner ====== */
-  useEffect(() => {
-    let alive = true;
-    let timer: number | null = null;
+  // COMMENTED OUT: Banner feature removed - no longer checking profile completeness
+  // useEffect(() => {
+  //   let alive = true;
+  //   let timer: number | null = null;
 
-    const computeNeed = (p: ProfileLite | null) => {
-      const nameOk = !!p?.name?.toString().trim();
-      const ageOk =
-        p?.age != null && Number.isInteger(p.age as number) &&
-        (p!.age as number) >= 14 && (p!.age as number) <= 100;
-      const cityOk = !!p?.city?.toString().trim();
-      return !(nameOk && ageOk && cityOk);
-    };
+  //   const computeNeed = (p: ProfileLite | null) => {
+  //     const nameOk = !!p?.name?.toString().trim();
+  //     const ageOk =
+  //       p?.age != null && Number.isInteger(p.age as number) &&
+  //       (p!.age as number) >= 14 && (p!.age as number) <= 100;
+  //     const cityOk = !!p?.city?.toString().trim();
+  //     return !(nameOk && ageOk && cityOk);
+  //   };
 
-    const fetchProfile = async () => {
-      try {
-        const p = (await getProfile()) as ProfileLite;
-        if (alive) setNeedProfile(computeNeed(p));
-      } catch (e: any) {
-        const status = e?.response?.status;
-        if (alive && (status === 404 || status === 204 || status === 401)) {
-          setNeedProfile(true);
-        }
-      }
-    };
+  //   const fetchProfile = async () => {
+  //     try {
+  //       const p = (await getProfile()) as ProfileLite;
+  //       if (alive) setNeedProfile(computeNeed(p));
+  //     } catch (e: any) {
+  //       const status = e?.response?.status;
+  //       if (alive && (status === 404 || status === 204 || status === 401)) {
+  //         setNeedProfile(true);
+  //       }
+  //     }
+  //   };
 
-    fetchProfile();
-    const startPoll = () => { stopPoll(); timer = window.setInterval(fetchProfile, 15000); };
-    const stopPoll = () => { if (timer != null) { clearInterval(timer); timer = null; } };
+  //   fetchProfile();
+  //   const startPoll = () => { stopPoll(); timer = window.setInterval(fetchProfile, 15000); };
+  //   const stopPoll = () => { if (timer != null) { clearInterval(timer); timer = null; } };
 
-    const onFocus = () => fetchProfile();
-    const onVisibility = () => { if (document.visibilityState === "visible") fetchProfile(); };
-    const onProfileUpdated = () => fetchProfile();
+  //   const onFocus = () => fetchProfile();
+  //   const onVisibility = () => { if (document.visibilityState === "visible") fetchProfile(); };
+  //   const onProfileUpdated = () => fetchProfile();
 
-    startPoll();
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("profile-updated", onProfileUpdated as EventListener);
+  //   startPoll();
+  //   window.addEventListener("focus", onFocus);
+  //   document.addEventListener("visibilitychange", onVisibility);
+  //   window.addEventListener("profile-updated", onProfileUpdated as EventListener);
 
-    return () => {
-      alive = false;
-      stopPoll();
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("profile-updated", onProfileUpdated as EventListener);
-    };
-  }, [pathname]);
+  //   return () => {
+  //     alive = false;
+  //     stopPoll();
+  //     window.removeEventListener("focus", onFocus);
+  //     document.removeEventListener("visibilitychange", onVisibility);
+  //     window.removeEventListener("profile-updated", onProfileUpdated as EventListener);
+  //   };
+  // }, [pathname]);
 
-  const goProfile = () => navigate("/profile");
+  // const goProfile = () => navigate("/profile");
 
-  const bannerTitle =
-    lang === "vi" ? "Hoàn tất hồ sơ của bạn" : "Complete your profile";
-  const bannerText =
-    lang === "vi"
-      ? "Vui lòng cập nhật hồ sơ để ChatGOV có thể cá nhân hoá câu trả lời."
-      : "Please fill your Full name, Age and City/District so ChatGOV can personalize answers.";
-  const bannerBtn = lang === "vi" ? "Đi tới Hồ sơ" : "Go to Profile";
+  // const bannerTitle =
+  //   lang === "vi" ? "Hoàn tất hồ sơ của bạn" : "Complete your profile";
+  // const bannerText =
+  //   lang === "vi"
+  //     ? "Vui lòng cập nhật hồ sơ để ChatGOV có thể cá nhân hoá câu trả lời."
+  //     : "Please fill your Full name, Age and City/District so ChatGOV can personalize answers.";
+  // const bannerBtn = lang === "vi" ? "Đi tới Hồ sơ" : "Go to Profile";
 
   return (
     <Shell
       data-collapsed={collapsed ? "true" : "false"}
-      data-banner={needProfile ? "1" : "0"}
     >
       <aside className="rail">
         <Sidebar collapsed={collapsed} onToggle={toggle} />
@@ -142,7 +144,8 @@ export default function AppLayout() {
           </svg>
         </MobileMenuButton>
 
-        {needProfile && (
+        {/* COMMENTED OUT: Banner removed */}
+        {/* {needProfile && (
           <Banner role="status" aria-live="polite">
             <div className="msg">
               <div className="icon" aria-hidden="true">
@@ -158,7 +161,7 @@ export default function AppLayout() {
             </div>
             <button className="go" onClick={goProfile}>{bannerBtn}</button>
           </Banner>
-        )}
+        )} */}
 
         <div className="content">
           <Outlet />
@@ -248,10 +251,10 @@ const Shell = styled.div`
     padding-top: 0;
   }
 
-  /* Desktop: chừa header + banner khi có banner (banner absolute) */
-  &[data-banner="1"] .content {
+  /* COMMENTED OUT: Banner feature removed */
+  /* &[data-banner="1"] .content {
     padding-top: calc(var(--topbar-h) + var(--banner-h));
-  }
+  } */
 
   /* Hide menu button on desktop */
   @media (min-width: 981px) {
@@ -268,9 +271,10 @@ const Shell = styled.div`
     .content { 
       padding-top: 64px; /* Space for hamburger button */
     }
-    &[data-banner="1"] .content { 
-      padding-top: 64px; /* Keep space even with banner */
-    }
+    /* COMMENTED OUT: Banner feature removed */
+    /* &[data-banner="1"] .content { 
+      padding-top: 64px;
+    } */
 
     /* Show menu button on mobile */
     .mobile-menu-btn {
@@ -310,8 +314,8 @@ const Shell = styled.div`
   }
 `;
 
-/* Header: FULL overlay desktop; sticky + blur mobile */
-const Topbar = styled.header`
+/* COMMENTED OUT: Topbar and Banner components - no longer used */
+/* const Topbar = styled.header`
   position: absolute;
   inset: 0 0 auto 0;
   height: var(--topbar-h);
@@ -368,19 +372,19 @@ const Topbar = styled.header`
     }
     .menuBtn { display: flex; }
   }
-`;
+`; */
 
-/* ===== Responsive Banner ===== */
-const Banner = styled.div`
+/* COMMENTED OUT: Banner component - no longer used
+const Banner = styled.div\`
   --r: 14px;
   position: absolute;
   top: var(--topbar-h);
   left: 0;
   right: 0;
-  height: var(--banner-h);                /* desktop: mỏng, cố định cao */
+  height: var(--banner-h);
   z-index: 6;
 
-  display: grid;                           /* desktop: 2 cột: nội dung | nút */
+  display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 12px;
@@ -405,27 +409,27 @@ const Banner = styled.div`
   .go:hover { filter: brightness(1.05); }
   .go:active { transform: translateY(1px); }
 
-  /* MOBILE: sticky + nội dung quấn dòng, nút xuống hàng (đọc đủ) */
   @media (max-width: 980px) {
     position: sticky;
     top: var(--topbar-h);
-    height: auto;                          /* auto cao theo nội dung */
-    grid-template-columns: 1fr;            /* 1 cột, nút xuống dưới */
+    height: auto;
+    grid-template-columns: 1fr;
     align-items: start;
     gap: 8px;
     padding: 10px 12px;
 
     .msg { align-items: flex-start; }
     .desc {
-      white-space: normal;                 /* ⟵ cho phép wrap, không ... */
+      white-space: normal;
       overflow: visible;
       text-overflow: clip;
     }
     .go {
-      width: 100%;                         /* nút full width dễ bấm */
+      width: 100%;
       height: 40px;
       border-radius: 12px;
-      justify-self: end;                   /* căn phải nếu chưa full width */
+      justify-self: end;
     }
   }
-`;
+\`;
+*/
