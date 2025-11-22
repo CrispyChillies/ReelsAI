@@ -114,7 +114,7 @@ class BonsaiSourcer:
                         "type": "author_feed",
                         "author": post.author.handle,
                         "content": post.record.text,
-                        "images": images,  # <--- Thêm trường này
+                        "images": images,
                         "created_at": post.record.created_at,
                         "like_count": post.like_count or 0,
                         "repost_count": post.repost_count or 0,

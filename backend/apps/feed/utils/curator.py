@@ -37,7 +37,8 @@ class BonsaiCurator:
         Output Format (JSON only):
         {
             "score": <int 0-10>,
-            "reasoning": "<short explanation why>"
+            "reasoning": "<short explanation why>",
+            "summary": "<concise summary of the post content in 1-2 sentences>"
         }
         """
 
