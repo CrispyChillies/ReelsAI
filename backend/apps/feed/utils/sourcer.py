@@ -24,33 +24,59 @@ class BonsaiSourcer:
             self.client = None
 
     def get_posts_by_query(self, query, limit=10):
-        """
-        Tìm kiếm bài post theo từ khóa (tương ứng với Search trong bài báo)
-        """
         if not self.client:
             return []
-
         print(f"🔎 Đang tìm kiếm bài viết với từ khóa: '{query}'...")
         try:
-            # Gọi API search_posts của Bluesky
             data = self.client.app.bsky.feed.search_posts(
                 params={"q": query, "limit": limit}
             )
-
-            # Trích xuất dữ liệu cần thiết
             results = []
+
             for post in data.posts:
+                # 1. Lấy Metrics (Nằm ở cấp ngoài cùng của Post View)
+                # Lưu ý: 'post' ở đây là object PostView của thư viện atproto
+                like_count = getattr(post, "like_count", 0)
+                repost_count = getattr(post, "repost_count", 0)
+                reply_count = getattr(post, "reply_count", 0)
+
+                # 2. Logic Lấy Ảnh Thông Minh (Hỗ trợ cả bài thường và bài Quote)
+                images = []
+
+                # Kiểm tra 'embed' ở cấp ngoài cùng
+                if hasattr(post, "embed") and post.embed:
+                    embed = post.embed
+
+                    # Trường hợp 1: Bài có ảnh trực tiếp (app.bsky.embed.images)
+                    if hasattr(embed, "images") and embed.images:
+                        for img in embed.images:
+                            if hasattr(img, "fullsize"):
+                                images.append(img.fullsize)
+
+                    # Trường hợp 2: Bài Quote/RecordWithMedia (app.bsky.embed.recordWithMedia)
+                    # Ảnh có thể nằm trong phần media đính kèm
+                    elif hasattr(embed, "media") and hasattr(embed.media, "images"):
+                        for img in embed.media.images:
+                            if hasattr(img, "fullsize"):
+                                images.append(img.fullsize)
+
+                    # Trường hợp 3 (Hiếm): Ảnh nằm sâu trong bài được quote (ít khi cần lấy cái này làm thumbnail chính)
+                rkey = post.uri.split("/")[-1]
+                post_url = f"https://bsky.app/profile/{post.author.handle}/post/{rkey}"
+
                 results.append(
                     {
                         "type": "search_result",
                         "author": post.author.handle,
                         "content": post.record.text,
+                        "images": images,  # List các link ảnh tìm được
                         "created_at": post.record.created_at,
-                        "like_count": post.like_count or 0,
-                        "repost_count": post.repost_count or 0,
-                        "reply_count": post.reply_count or 0,
-                        "uri": post.uri,  # ID định danh bài viết
-                        "cid": post.cid,  # Content ID
+                        "like_count": like_count,
+                        "repost_count": repost_count,
+                        "reply_count": reply_count,
+                        "uri": post.uri,
+                        "cid": post.cid,
+                        "post_url": post_url,  # <--- THÊM TRƯỜNG NÀY
                     }
                 )
             return results
@@ -60,7 +86,7 @@ class BonsaiSourcer:
 
     def get_posts_by_author(self, author_handle, limit=10):
         """
-        Lấy bài post từ một user cụ thể (tương ứng với Accounts you follow)
+        Lấy bài post từ một user cụ thể
         """
         if not self.client:
             return []
@@ -73,11 +99,22 @@ class BonsaiSourcer:
             results = []
             for feed_view in data.feed:
                 post = feed_view.post
+
+                # --- LOGIC MỚI: LẤY ẢNH ---
+                images = []
+                if hasattr(post, "embed") and hasattr(post.embed, "images"):
+                    if post.embed.images:
+                        for img in post.embed.images:
+                            if hasattr(img, "fullsize"):
+                                images.append(img.fullsize)
+                # --------------------------
+
                 results.append(
                     {
                         "type": "author_feed",
                         "author": post.author.handle,
                         "content": post.record.text,
+                        "images": images,  # <--- Thêm trường này
                         "created_at": post.record.created_at,
                         "like_count": post.like_count or 0,
                         "repost_count": post.repost_count or 0,
@@ -96,14 +133,13 @@ class BonsaiSourcer:
 if __name__ == "__main__":
     sourcer = BonsaiSourcer()
 
-    # Test 1: Tìm bài viết về xAI
-    posts = sourcer.get_posts_by_query("Explainable AI", limit=3)
+    # Test: Tìm bài viết có khả năng có ảnh (ví dụ: Art, Cat, Dog)
+    posts = sourcer.get_posts_by_query("Explainable AI, Transformers", limit=5)
     print("\n--- KẾT QUẢ SEARCH ---")
     for p in posts:
-        print(f"[{p['author']}]: {p['content'][:50]}... (Likes: {p['like_count']})")
-
-    # Test 2: Lấy bài từ Yann LeCun (hoặc thay bằng user khác)
-    # author_posts = sourcer.get_posts_by_author("yannlecun.bsky.social", limit=3)
-    # print("\n--- KẾT QUẢ AUTHOR ---")
-    # for p in author_posts:
-    #     print(f"[{p['author']}]: {p['content'][:50]}...")
+        with open("bluesky_test_output.txt", "a", encoding="utf-8") as f:
+            f.write(str(p) + "\n")
+        has_img = "📸 CÓ ẢNH" if p["images"] else "📄 Text only"
+        print(f"[{p['author']}] ({has_img}): {p['content'][:30]}...")
+        if p["images"]:
+            print(f"   Link ảnh: {p['images'][0]}")

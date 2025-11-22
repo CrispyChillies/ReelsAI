@@ -10,6 +10,7 @@ from .utils.tiktok_ingestion import fetch_tiktok_videos
 from .utils.video_processor import VideoPreprocessor
 from .utils.ai_engine import GeminiEngine
 import os
+import requests
 
 
 @shared_task(name="update_feed_task")
@@ -48,34 +49,78 @@ def update_feed_task(feed_id):
     return f"✅ Finished updating feed {feed_id}"
 
 
+def fetch_tiktok_oembed_sync(url):
+    """
+    Gọi TikTok OEmbed API để lấy mã HTML hiển thị video.
+    """
+    if not url:
+        return None
+
+    api = f"https://www.tiktok.com/oembed?url={url}"
+    try:
+        # Timeout 5s để không làm treo worker quá lâu
+        r = requests.get(api, timeout=5)
+        if r.status_code == 200:
+            return r.json().get("html")
+        else:
+            print(f"⚠️ OEmbed Error {r.status_code} for {url}")
+    except Exception as e:
+        print(f"⚠️ OEmbed Exception: {e}")
+    return None
+
+
 def _process_bluesky(feed, criteria):
     sourcer = BonsaiSourcer()
     curator = BonsaiCurator()
 
     for query in feed.search_queries:
+        # Gọi sourcer (đảm bảo sourcer.py đã được update để trả về key 'images')
         posts = sourcer.get_posts_by_query(query, limit=5)
+
         for p in posts:
-            # Lưu vào Cache (SocialPost)
-            post_obj, _ = SocialPost.objects.update_or_create(
-                platform_id=p["uri"],
-                defaults={
-                    "platform": "bluesky",
-                    "author": p["author"],
-                    "content": p["content"],
-                    "like_count": p["like_count"],
-                    "repost_count": p["repost_count"],
-                },
-            )
-            # AI Chấm điểm (Nếu chưa chấm)
-            if not FeedItem.objects.filter(feed=feed, post=post_obj).exists():
-                rating = curator.rate_post(p["content"], criteria)
-                if rating["score"] >= 4:
-                    FeedItem.objects.create(
-                        feed=feed,
-                        post=post_obj,
-                        ai_score=rating["score"],
-                        ai_reasoning=rating["reasoning"],
-                    )
+            try:
+                # --- 1. XỬ LÝ ẢNH ---
+                # Kiểm tra nếu bài viết có danh sách ảnh, lấy cái đầu tiên làm thumbnail
+                image_url = None
+                if p.get("images") and len(p["images"]) > 0:
+                    image_url = p["images"][0]
+
+                # --- 2. LƯU CACHE (SocialPost) ---
+                post_obj, _ = SocialPost.objects.update_or_create(
+                    platform_id=p["uri"],
+                    defaults={
+                        "platform": "bluesky",
+                        "author": p["author"],
+                        "content": p["content"],
+                        # Dùng .get() để an toàn nếu field bị thiếu
+                        "like_count": p.get("like_count", 0),
+                        "repost_count": p.get("repost_count", 0),
+                        "reply_count": p.get("reply_count", 0),
+                        # Lưu thời gian tạo bài gốc (quan trọng cho việc sort độ mới)
+                        "created_at_source": p.get("created_at"),
+                        # Lưu Link Ảnh
+                        "thumbnail_url": image_url,
+                        "source_link": p.get("post_url"),
+                    },
+                )
+
+                # --- 3. AI CHẤM ĐIỂM (Curator) ---
+                # Chỉ chấm điểm nếu bài này chưa có trong Feed hiện tại
+                if not FeedItem.objects.filter(feed=feed, post=post_obj).exists():
+                    rating = curator.rate_post(p["content"], criteria)
+
+                    # Chỉ lưu bài đạt chuẩn (Score >= 4)
+                    if rating["score"] >= 4:
+                        FeedItem.objects.create(
+                            feed=feed,
+                            post=post_obj,
+                            ai_score=rating["score"],
+                            ai_reasoning=rating["reasoning"],
+                        )
+
+            except Exception as e:
+                print(f"⚠️ Lỗi xử lý bài viết {p.get('uri')}: {e}")
+                continue
 
 
 def _process_tiktok(feed, criteria):
@@ -87,16 +132,23 @@ def _process_tiktok(feed, criteria):
 
     for vid in raw_videos:
         # Lưu Cache
+        video_url = vid.get("video_url")
+        embed_html = fetch_tiktok_oembed_sync(video_url)
+
         post_obj, _ = SocialPost.objects.update_or_create(
-            platform_id=vid["video_url"],
+            platform_id=video_url,
             defaults={
                 "platform": "tiktok",
                 "author": vid["author"],
                 "content": vid["desc"],  # Caption gốc
-                "media_url": vid.get("mediaUrls"),
-                "thumbnail_url": vid.get(
-                    "thumbnail_url"
-                ),  # Cần sửa fetch_tiktok_videos trả về cái này
+                "thumbnail_url": vid.get("author_avatar"),
+                # Metrics tương tác
+                "like_count": vid.get("like_count", 0),
+                "repost_count": vid.get("repost_count", 0),
+                "reply_count": vid.get("reply_count", 0),
+                "created_at_source": vid.get("created_at"),
+                "source_link": video_url,
+                "embed_quote": embed_html,
             },
         )
 

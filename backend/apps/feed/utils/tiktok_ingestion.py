@@ -51,6 +51,8 @@ def fetch_tiktok_videos(keywords: list, max_items: int = 5):
             if not video_url:
                 continue
 
+            author_meta = item.get("authorMeta", {})
+
             video_info = {
                 "platform": "tiktok",
                 "id": item.get("id"),
@@ -65,6 +67,11 @@ def fetch_tiktok_videos(keywords: list, max_items: int = 5):
                     else []
                 ),
                 "mediaUrls": media_url,  # Thêm trường mediaUrls để tải video nhanh hơn
+                "like_count": item.get("diggCount", 0),
+                "repost_count": item.get("shareCount", 0),
+                "reply_count": item.get("commentCount", 0),
+                "author_avatar": author_meta.get("avatar"),
+                "created_at": item.get("createTimeISO"),
             }
             cleaned_data.append(video_info)
         except Exception as e:

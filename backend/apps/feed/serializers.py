@@ -18,6 +18,8 @@ class SocialPostSerializer(serializers.ModelSerializer):
             "content",
             "media_url",
             "thumbnail_url",
+            "source_link",
+            "embed_quote",
             "like_count",
             "repost_count",
             "fetched_at",

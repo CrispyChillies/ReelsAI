@@ -46,6 +46,15 @@ class SocialPost(models.Model):
 
     media_url = models.URLField(max_length=500, null=True, blank=True)
     thumbnail_url = models.URLField(max_length=500, null=True, blank=True)
+    source_link = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Link post for user to click to view",
+    )
+    embed_quote = models.TextField(
+        null=True, blank=True, help_text="HTML Embed of TikTok"
+    )
 
     # Metadata phục vụ Ranking
     like_count = models.IntegerField(default=0)
