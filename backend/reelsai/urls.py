@@ -14,6 +14,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -23,8 +24,13 @@ from apps.video_tiktok.urls import urlpatterns as video_tiktok_urls
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.users.urls")),
-    path('api/', include('apps.hashtag_crawling.urls')),
-    path('api/', include('apps.video_tiktok.urls')),
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    # path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path("api/", include("apps.hashtag_crawling.urls")),
+    path("api/", include("apps.video_tiktok.urls")),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path("api/", include("apps.feed.urls")),
 ]
