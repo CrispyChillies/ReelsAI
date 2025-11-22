@@ -1,136 +1,111 @@
-import React, { useEffect, useState } from "react";
 import styled from "styled-components";
-// COMMENTED OUT: Backend reset password API
-// import { resetPasswordWithRecoveryToken } from "@/services/auth";
-import { useToast } from "@/app/toast";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { useParams, Link, Navigate } from "react-router-dom";
 import { useI18n } from "@/app/i18n";
-import LoaderPage from "@/components/common/loaders/LoaderPage";
-import { useNavigate } from "react-router-dom";
 import Button from "@/components/common/buttons/Button";
 import PwField from "@/components/common/inputs/PwField";
-// COMMENTED OUT: Error formatter
-// import { formatError } from "@/utils/formatError";
+import { useAuth } from "@/hooks/useAuth";
 
 // ảnh trong /public
 const bg = "/forgot-reset-bg.jpg";
 
+type ResetPasswordFormData = {
+  password: string;
+  password2: string;
+};
+
 export default function ResetPassword() {
-  const { notify } = useToast();
-  const { t } = useI18n();
-  const nav = useNavigate();
+  useI18n();
+  const { uidb64, token } = useParams<{ uidb64: string; token: string }>();
+  const { resetPassword, isResettingPassword } = useAuth();
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const {
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<ResetPasswordFormData>();
 
-  const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [pw, setPw] = useState("");
-  const [pw2, setPw2] = useState("");
-  // const [recoveryToken, setRecoveryToken] = useState<string>("");
-
-  useEffect(() => {
-    // DEMO: Skip token validation in demo mode
-    // Just set ready to true to show the form
-    setReady(true);
-    
-    // COMMENTED OUT: Real token validation
-    // const url = new URL(window.location.href);
-    // const hashParams = new URLSearchParams(
-    //   (window.location.hash || "").replace(/^#/, "")
-    // );
-    // const qParams = url.searchParams;
-
-    // const type = (
-    //   hashParams.get("type") ||
-    //   qParams.get("type") ||
-    //   ""
-    // ).toLowerCase();
-    // const token =
-    //   hashParams.get("access_token") || qParams.get("access_token") || "";
-
-    // if (type === "recovery" && token) {
-    //   setRecoveryToken(token);
-    //   setReady(true);
-    //   return;
-    // }
-
-    // notify({
-    //   title: t("error"),
-    //   content: t("missingOrInvalidResetToken") || "Missing or invalid reset token",
-    //   tone: "error",
-    // });
-    // nav("/signin");
-  }, []);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pw.length < 8) {
-      notify({
-        title: t("error"),
-        content: t("passwordTooShort"),
-        tone: "error",
-      });
+  const onSubmit = (data: ResetPasswordFormData) => {
+    if (!uidb64 || !token) {
       return;
     }
-    if (pw !== pw2) {
-      notify({
-        title: t("error"),
-        content: t("confirmPassword"),
-        tone: "error",
-      });
+    if (password !== password2) {
       return;
     }
-
-    // DEMO: Simulate password reset without backend
-    setLoading(true);
-    setTimeout(() => {
-      notify({ title: "Demo", content: "Password reset successfully (simulated)", tone: "success" });
-      setLoading(false);
-      nav("/signin");
-    }, 1000);
-
-    // COMMENTED OUT: Real backend password reset
-    // try {
-    //   setLoading(true);
-    //   await resetPasswordWithRecoveryToken(recoveryToken, pw);
-    //   window.history.replaceState({}, document.title, window.location.pathname);
-    //   notify({ title: t("passwordUpdated"), tone: "success" });
-    //   nav("/signin");
-    // } catch (err: any) {
-    //   notify({ title: t("error"), content: formatError(err), tone: "error" });
-    // } finally {
-    //   setLoading(false);
-    // }
+    resetPassword({
+      uidb64,
+      token,
+      password: data.password,
+    });
   };
 
-  if (!ready)
-    return (
-      <Wrap $bg={bg}>
-        <LoaderPage />
-      </Wrap>
-    );
+  // Invalid token/uidb64
+  if (!uidb64 || !token) {
+    return <Navigate to="/auth/sign-in" replace />;
+  }
 
   return (
     <Wrap $bg={bg}>
-      <section className="container">
-        <header>{t("setNewPassword")}</header>
-        <form className="form" onSubmit={submit}>
-          <PwField
-            label={t("newPassword")}
-            value={pw}
-            onChange={setPw}
-            autoComplete="new-password"
-            required
-          />
-          <PwField
-            label={t("confirmPassword")}
-            value={pw2}
-            onChange={setPw2}
-            autoComplete="new-password"
-            required
-          />
-          <Button type="submit" wfull size="md" disabled={loading}>
-            {t("updatePassword")}
-          </Button>
-        </form>
-      </section>
+      <div className="panel">
+        <div className="container">
+          <header>Reset Password</header>
+          <p className="description">Enter your new password below.</p>
+
+          <form className="form" onSubmit={handleSubmit(onSubmit)}>
+            <div className="input-box">
+              <PwField
+                label="New Password"
+                value={password}
+                onChange={(v) => {
+                  setPassword(v);
+                  setValue("password", v, { shouldValidate: true });
+                }}
+                placeholder="Enter new password"
+                autoComplete="new-password"
+                disabled={isResettingPassword}
+              />
+              {errors.password && (
+                <span className="error">{errors.password.message}</span>
+              )}
+            </div>
+
+            <div className="input-box">
+              <PwField
+                label="Confirm New Password"
+                value={password2}
+                onChange={(v) => {
+                  setPassword2(v);
+                  setValue("password2", v, { shouldValidate: true });
+                }}
+                placeholder="Confirm new password"
+                autoComplete="new-password"
+                disabled={isResettingPassword}
+              />
+              {password2 && password !== password2 && (
+                <span className="error">Passwords do not match</span>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              wfull
+              size="md"
+              loading={isResettingPassword}
+              disabled={isResettingPassword}
+            >
+              Reset Password
+            </Button>
+          </form>
+
+          <div className="links">
+            <Link to="/auth/sign-in" className="cta">
+              Back to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
     </Wrap>
   );
 }
@@ -149,6 +124,14 @@ const Wrap = styled.div<{ $bg: string }>`
   background-repeat: no-repeat;
   background-color: ${({ theme }) => theme.colors.bg};
 
+  .panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: min(100%, 640px);
+  }
+
   .container {
     max-width: 520px;
     width: 100%;
@@ -158,17 +141,89 @@ const Wrap = styled.div<{ $bg: string }>`
     padding: 24px;
     box-shadow: ${({ theme }) => theme.shadow};
   }
+
   header {
     text-align: center;
     font-weight: 700;
     font-size: 1.2rem;
-    color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.accent};
   }
+
+  .description {
+    text-align: center;
+    color: ${({ theme }) => theme.colors.secondary};
+    margin-top: 12px;
+    font-size: 0.95rem;
+  }
+
   .form {
     margin-top: 16px;
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .input-box {
+    width: 100%;
+  }
+
+  .input-box label {
+    font-weight: 600;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  .form :where(.input-box input) {
+    height: 38px;
+    width: 100%;
+    outline: none;
+    font-size: 1rem;
+    color: ${({ theme }) => theme.colors.primary};
+    margin-top: 6px;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    border-radius: 10px;
+    padding: 0 12px;
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .input-box input::placeholder {
+    color: ${({ theme }) => theme.colors.secondary};
+    opacity: 0.8;
+  }
+
+  .input-box input:focus {
+    border-color: ${({ theme }) => theme.colors.accent};
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+  }
+
+  .error {
+    display: block;
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 4px;
+  }
+
+  .links {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .cta {
+    color: ${({ theme }) => theme.colors.accent};
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-size: 0.96rem;
+  }
+
+  .cta:hover {
+    color: ${({ theme }) => theme.colors.accent2};
+  }
+
+  .cta:focus-visible {
+    outline: 3px solid rgba(206, 122, 88, 0.35);
+    outline-offset: 2px;
   }
 
   @media (max-width: 480px) {

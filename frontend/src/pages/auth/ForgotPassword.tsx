@@ -1,64 +1,35 @@
-import { useState } from "react";
 import styled from "styled-components";
-import LoaderPage from "@/components/common/loaders/LoaderPage";
-// COMMENTED OUT: Backend forgot password API
-// import { forgotPassword } from "@/services/auth";
-import { useToast } from "@/app/toast";
 import { useI18n } from "@/app/i18n";
 import ForgotForm from "@/components/forms/ForgotPasswordForm";
-// COMMENTED OUT: Error formatter
-// import { formatError } from "@/utils/formatError";
+import { useAuth } from "@/hooks/useAuth";
 
 // ảnh trong /public
 const bg = "/forgot-reset-bg.jpg";
 
 export default function ForgotPage() {
-  const [loading, setLoading] = useState(false);
-  const { notify } = useToast();
+  const { requestPasswordReset, isRequestingPasswordReset } = useAuth();
   const { t } = useI18n();
 
-  const submit = async (email: string) => {
-    setLoading(true);
-    
-    // DEMO: Simulate forgot password without backend
-    setTimeout(() => {
-      notify({ title: "Demo", content: "Password reset link sent (simulated)", tone: "success" });
-      setLoading(false);
-      // Navigate to check-email page
-      window.location.href = `/check-email?mode=reset&email=${encodeURIComponent(email)}`;
-    }, 1000);
-
-    // COMMENTED OUT: Real backend forgot password
-    // try {
-    //   await forgotPassword(email);
-    //   window.location.href = `/check-email?mode=reset&email=${encodeURIComponent(email)}`;
-    // } catch (e: any) {
-    //   notify({ title: t("error"), content: formatError(e), tone: "error" });
-    // } finally {
-    //   setLoading(false);
-    // }
+  const handleSubmit = (data: { email: string }) => {
+    requestPasswordReset(data.email);
   };
 
   return (
     <Wrap $bg={bg}>
-      {loading ? (
-        <LoaderPage />
-      ) : (
-        <div className="panel">
-          <ForgotForm onSubmit={submit} loading={loading} />
-          <div className="links">
-            <span className="muted">{t("haveAccount")}</span>
-            <a className="cta" href="/signin">
-              {t("signin")}
-            </a>
-            <span className="dot">•</span>
-            <span className="muted">{t("needAccount")}</span>
-            <a className="cta" href="/signup">
-              {t("signup")}
-            </a>
-          </div>
+      <div className="panel">
+        <ForgotForm onSubmit={handleSubmit} loading={isRequestingPasswordReset} />
+        <div className="links">
+          <span className="muted">{t("haveAccount")}</span>
+          <a className="cta" href="/auth/sign-in">
+            {t("signin")}
+          </a>
+          <span className="dot">•</span>
+          <span className="muted">{t("needAccount")}</span>
+          <a className="cta" href="/auth/sign-up">
+            {t("signup")}
+          </a>
         </div>
-      )}
+      </div>
     </Wrap>
   );
 }

@@ -50,9 +50,15 @@ const Button: React.FC<ButtonProps> = ({
       className={className}
       ref={ref}
     >
-      {iconLeft && <i className="icon left">{iconLeft}</i>}
-      <span className="txt">{loading ? "…" : children}</span>
-      {iconRight && <i className="icon right">{iconRight}</i>}
+      {loading ? (
+        <span className="spinner" />
+      ) : (
+        <>
+          {iconLeft && <i className="icon left">{iconLeft}</i>}
+          <span className="txt">{children}</span>
+          {iconRight && <i className="icon right">{iconRight}</i>}
+        </>
+      )}
     </Btn>
   );
 };
@@ -159,4 +165,21 @@ const Btn = styled.button`
   .txt {
     line-height: 1;
   }
+
+  /* Spinner animation */
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 `;
+

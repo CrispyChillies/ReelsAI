@@ -1,48 +1,50 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-// Auth pages - UI accessible for editing (backend calls commented inside)
 import SignIn from "@/pages/auth/SignIn";
 import SignUp from "@/pages/auth/SignUp";
 import Forgot from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import CheckEmailPage from "./pages/auth/CheckEmailPage";
-import OnboardingTopics from "@/pages/OnboardingTopics";
 
 import AppLayout from "@/components/layout/AppLayout";
 import NewsfeedPage from "@/pages/NewsfeedPage";
 import ChatPage from "@/pages/ChatPage";
 import Profile from "@/pages/Profile";
 import SavedContent from "@/pages/SavedContent";
-
-// COMMENTED OUT: Supabase redirect hook (not needed in demo)
-// import useSupabaseRedirect from "@/hooks/useSupabaseRedirect";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 export default function App() {
-  // COMMENTED OUT: Supabase redirect handling (not needed in demo)
-  // useSupabaseRedirect();
-
   return (
     <Routes>
-      {/* ===== Auth routes - UI accessible, no backend required ===== */}
-      <Route path="/signin" element={<SignIn />} />
-      <Route path="/signup" element={<SignUp />} />
-      <Route path="/forgot" element={<Forgot />} />
-      <Route path="/reset" element={<ResetPassword />} />
-      <Route path="/check-email" element={<CheckEmailPage />} />
+      {/* ===== Auth routes ===== */}
+      <Route path="/auth/sign-in" element={<SignIn />} />
+      <Route path="/auth/sign-up" element={<SignUp />} />
+      <Route path="/auth/forgot-password" element={<Forgot />} />
+      <Route
+        path="/auth/reset-password/:uidb64/:token"
+        element={<ResetPassword />}
+      />
+      <Route path="/auth/check-email" element={<CheckEmailPage />} />
 
-      {/* ===== Onboarding ===== */}
-      <Route path="/onboarding/topics" element={<OnboardingTopics />} />
+      {/* Legacy auth routes - redirect to new routes */}
+      <Route path="/signin" element={<Navigate to="/auth/sign-in" replace />} />
+      <Route path="/signup" element={<Navigate to="/auth/sign-up" replace />} />
+      <Route path="/forgot" element={<Navigate to="/auth/forgot-password" replace />} />
+      <Route path="/reset" element={<Navigate to="/auth/sign-in" replace />} />
+      <Route path="/check-email" element={<Navigate to="/auth/check-email" replace />} />
 
-      {/* ===== App routes with sidebar ===== */}
-      <Route element={<AppLayout />}>
-        <Route path="/app" element={<NewsfeedPage />} />
-        <Route path="/feed" element={<NewsfeedPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/saved" element={<SavedContent />} />
-        <Route path="/profile" element={<Profile />} />
+      {/* ===== Protected app routes with sidebar ===== */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppLayout />}>
+          <Route path="/app" element={<NewsfeedPage />} />
+          <Route path="/feed" element={<NewsfeedPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/saved" element={<SavedContent />} />
+          <Route path="/profile" element={<Profile />} />
+        </Route>
       </Route>
 
       {/* fallback */}
-      <Route path="*" element={<Navigate to="/signin" replace />} />
+      <Route path="*" element={<Navigate to="/auth/sign-in" replace />} />
     </Routes>
   );
 }

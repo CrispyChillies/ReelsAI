@@ -1,52 +1,70 @@
 import React, { useState } from "react";
 import styled from "styled-components";
+import { useForm } from "react-hook-form";
 import { useI18n } from "@/app/i18n";
 import Button from "@/components/common/buttons/Button";
 import PwField from "@/components/common/inputs/PwField";
+import type { SignInRequest } from "@/types/auth";
 
 type Props = {
-  onSubmit: (email: string, password: string) => void;
+  onSubmit: (data: SignInRequest) => void;
   loading?: boolean;
 };
 
 const LoginForm: React.FC<Props> = ({ onSubmit, loading }) => {
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
   const { t } = useI18n();
+  const [password, setPassword] = useState("");
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<SignInRequest>({
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
 
   return (
     <StyledWrapper>
       <section className="container">
         <header>{t("signin")}</header>
 
-        <form
-          className="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit(email.trim(), pw);
-          }}
-        >
+        <form className="form" onSubmit={handleSubmit(onSubmit)}>
           <div className="input-box">
-            <label>{t("email")}</label>
+            <label>Username</label>
             <input
-              required
-              placeholder="Email của bạn"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Your username"
+              {...register("username", {
+                required: "Username is required",
+              })}
             />
+            {errors.username && (
+              <span className="error">{errors.username.message}</span>
+            )}
           </div>
 
-          <PwField
-            label={t("password")}
-            value={pw}
-            onChange={setPw}
-            autoComplete="current-password"
-            required
-          />
+          <div className="input-box">
+            <PwField
+              label="Password"
+              value={password}
+              onChange={(v) => {
+                setPassword(v);
+                setValue("password", v, { shouldValidate: true });
+              }}
+              placeholder="Your password"
+              autoComplete="current-password"
+              disabled={loading}
+            />
+            {errors.password && (
+              <span className="error">{errors.password.message}</span>
+            )}
+          </div>
 
-          <Button type="submit" wfull size="md" disabled={!!loading}>
-            {loading ? t("loggingIn") : t("login")}
+          <Button type="submit" wfull size="md" loading={loading} disabled={loading}>
+            {t("login")}
           </Button>
         </form>
       </section>
@@ -113,6 +131,12 @@ const StyledWrapper = styled.div`
   }
   .input-box input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+  }
+  .error {
+    display: block;
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 4px;
   }
 `;

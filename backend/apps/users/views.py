@@ -71,7 +71,16 @@ class RegisterView(APIView):
             send_mail(subject, plain_message, settings.DEFAULT_FROM_EMAIL, recipient_list, html_message=html_message)
 
             return Response({"message": "Please check your email to confirm registration"}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Format validation errors
+        error_messages = []
+        for field, errors in serializer.errors.items():
+            for error in errors:
+                error_messages.append(f"{field}: {error}")
+        return Response(
+            {"error": "; ".join(error_messages)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class ActivateAccountView(APIView):
@@ -94,16 +103,16 @@ class ActivateAccountView(APIView):
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')
+            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173')
             return redirect(f"{frontend_base}/verification-failed/")
 
         if default_token_generator.check_token(user, token):
             user.is_active = True
             user.save()
-            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')
+            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173')
             return redirect(f"{frontend_base}/account-success/")
         else:
-            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')
+            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173')
             return redirect(f"{frontend_base}/verification-failed/")
 
 
@@ -232,8 +241,8 @@ class RequestPasswordResetView(APIView):
 
         uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')
-        reset_link = f"{frontend_base}/reset-password/{uidb64}/{token}/"
+        frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173')
+        reset_link = f"{frontend_base}/auth/reset-password/{uidb64}/{token}/"
 
         subject = "Đặt lại mật khẩu cho tài khoản - ReelsAI"
         html_message = render_to_string("users/reset_password_email.html", {"user": user, "reset_link": reset_link})
@@ -284,10 +293,177 @@ class ResetPasswordView(APIView):
             return Response({"error": "Liên kết đặt lại mật khẩu không hợp lệ!"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not default_token_generator.check_token(user, token):
-            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:3000')
-            return redirect(f"{frontend_base}/reset-password/failed")
+            frontend_base = getattr(settings, 'FRONTEND_BASE_URL', 'http://localhost:5173')
+            return redirect(f"{frontend_base}/auth/reset-password/failed")
 
         new_password = request.data.get("password")
         user.set_password(new_password)
         user.save()
         return Response({"message": "Mật khẩu đã được đặt lại thành công!"}, status=status.HTTP_200_OK)
+
+
+class CurrentUserView(APIView):
+    """
+    Get current authenticated user information.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Auth"],
+        summary="Get current user",
+        description="Returns the authenticated user's information.",
+        responses={
+            200: UserResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+        examples=[
+            OpenApiExample(
+                "Current user success",
+                value={
+                    "id": 1,
+                    "username": "alice",
+                    "email": "alice@example.com",
+                    "first_name": "Alice",
+                    "last_name": "Smith",
+                    "is_active": True,
+                    "date_joined": "2025-11-22T00:00:00Z"
+                },
+                response_only=True,
+            ),
+        ],
+    )
+    def get(self, request):
+        serializer = UserResponseSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdateProfileView(APIView):
+    """
+    Update current user's profile information (username, email, first_name, last_name).
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Profile"],
+        summary="Update profile",
+        description="Update the authenticated user's profile information.",
+        request=UpdateProfileSerializer,
+        responses={
+            200: UserResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+        examples=[
+            OpenApiExample(
+                "Update profile payload",
+                value={
+                    "username": "newalice",
+                    "email": "newalice@example.com",
+                    "first_name": "Alice",
+                    "last_name": "Johnson"
+                },
+                request_only=True,
+            ),
+        ],
+    )
+    def patch(self, request):
+        user = request.user
+        serializer = UpdateProfileSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            # Check if username is being changed and if it's already taken
+            new_username = serializer.validated_data.get('username')
+            if new_username and new_username != user.username:
+                if User.objects.filter(username=new_username).exists():
+                    return Response(
+                        {"error": "Username already exists"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Check if email is being changed and if it's already taken
+            new_email = serializer.validated_data.get('email')
+            if new_email and new_email != user.email:
+                if User.objects.filter(email=new_email).exists():
+                    return Response(
+                        {"error": "Email already exists"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            serializer.save()
+            response_serializer = UserResponseSerializer(user)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        
+        # Format validation errors
+        error_messages = []
+        for field, errors in serializer.errors.items():
+            for error in errors:
+                error_messages.append(f"{field}: {error}")
+        return Response(
+            {"error": "; ".join(error_messages)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class ChangePasswordView(APIView):
+    """
+    Change the authenticated user's password.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Profile"],
+        summary="Change password",
+        description="Change the authenticated user's password. Requires current password verification.",
+        request=ChangePasswordSerializer,
+        responses={
+            200: MessageResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+        examples=[
+            OpenApiExample(
+                "Change password payload",
+                value={
+                    "current_password": "OldPass123!",
+                    "new_password": "NewPass456!"
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Change password success",
+                value={"message": "Password updated successfully"},
+                response_only=True,
+            ),
+        ],
+    )
+    def post(self, request):
+        user = request.user
+        serializer = ChangePasswordSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            current_password = serializer.validated_data['current_password']
+            new_password = serializer.validated_data['new_password']
+            
+            # Verify current password
+            if not user.check_password(current_password):
+                return Response(
+                    {"error": "Current password is incorrect"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set new password
+            user.set_password(new_password)
+            user.save()
+            
+            return Response(
+                {"message": "Password updated successfully"},
+                status=status.HTTP_200_OK
+            )
+        
+        # Format validation errors
+        error_messages = []
+        for field, errors in serializer.errors.items():
+            for error in errors:
+                error_messages.append(f"{field}: {error}")
+        return Response(
+            {"error": "; ".join(error_messages)},
+            status=status.HTTP_400_BAD_REQUEST
+        )

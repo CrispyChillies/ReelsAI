@@ -71,12 +71,14 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: () => void }> = ({
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
+    // Show errors longer (3s), others 2s
+    const duration = tone === "error" ? 3000 : 2000;
     const t = setTimeout(() => {
       setLeaving(true);
       setTimeout(onDismiss, 320);
-    }, 6000);
+    }, duration);
     return () => clearTimeout(t);
-  }, [onDismiss]);
+  }, [onDismiss, tone]);
 
   const ToneIcon =
     tone === "success"

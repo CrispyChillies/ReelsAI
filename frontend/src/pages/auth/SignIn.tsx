@@ -1,71 +1,50 @@
-import { useState } from "react";
 import styled from "styled-components";
 import LoginForm from "@/components/forms/LoginForm";
-import { Link, useNavigate } from "react-router-dom";
-import LoaderPage from "@/components/common/loaders/LoaderPage";
-import { useToast } from "@/app/toast";
+import { Link } from "react-router-dom";
 import { useI18n } from "@/app/i18n";
 import ThreeDBackground from "@/components/common/ThreeDBackground";
-// COMMENTED OUT: Backend login API
-// import { login } from "@/services/auth";
-// COMMENTED OUT: Error formatter
-// import { formatError } from "@/utils/formatError";
+import { useAuth } from "@/hooks/useAuth";
+import type { SignInRequest } from "@/types/auth";
 
 export default function SignIn() {
-  const nav = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const { notify } = useToast();
+  const { signIn, isSigningIn } = useAuth();
   const { t } = useI18n();
 
-  const submit = async (email: string, password: string) => {
-    setLoading(true);
-    
-    // DEMO: Simulate login without backend
-    setTimeout(() => {
-      notify({ title: "Demo Login", content: "Navigating to app (no real auth)", tone: "success" });
-      setLoading(false);
-      nav("/app");
-    }, 1000);
+  const handleSubmit = (data: SignInRequest) => {
+    console.log('SignIn handleSubmit called with:', data);
+    signIn(data);
   };
 
   return (
     <Wrap>
-      {loading ? (
-        <div className="loaderWrapper">
-          <LoaderPage />
+      {/* Left Side - 3D Interactive Background */}
+      <div className="leftSide">
+        <ThreeDBackground />
+        <div className="content">
+          <h1 className="brand">ReelsAI</h1>
+          <p className="tagline">Your AI-powered assistant for Reels</p>
         </div>
-      ) : (
-        <>
-          {/* Left Side - 3D Interactive Background */}
-          <div className="leftSide">
-            <ThreeDBackground />
-            <div className="content">
-              <h1 className="brand">ReelsAI</h1>
-              <p className="tagline">Your AI-powered assistant for everything</p>
-            </div>
-          </div>
+      </div>
 
-          {/* Right Side - Form */}
-          <div className="rightSide">
-            <div className="formContainer">
-              <LoginForm onSubmit={submit} loading={loading} />
-              <div className="links">
-                <div className="row">
-                  <span className="muted">{t("needAccount")}</span>
-                  <Link to="/signup" className="cta">
-                    {t("signup")}
-                  </Link>
-                </div>
-                <div className="row">
-                  <Link to="/forgot" className="cta">
-                    {t("forgot")}
-                  </Link>
-                </div>
-              </div>
+      {/* Right Side - Form */}
+      <div className="rightSide">
+        <div className="formContainer">
+          <LoginForm onSubmit={handleSubmit} loading={isSigningIn} />
+          <div className="links">
+            <div className="row">
+              <span className="muted">{t("needAccount")}</span>
+              <Link to="/auth/sign-up" className="cta">
+                {t("signup")}
+              </Link>
+            </div>
+            <div className="row">
+              <Link to="/auth/forgot-password" className="cta">
+                {t("forgot")}
+              </Link>
             </div>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </Wrap>
   );
 }
@@ -74,15 +53,6 @@ const Wrap = styled.div`
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  
-  /* Loader Wrapper - Full screen centered */
-  .loaderWrapper {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-  }
   
   /* Left Side - 3D Interactive Background */
   .leftSide {

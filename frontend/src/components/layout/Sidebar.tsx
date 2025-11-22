@@ -1,21 +1,13 @@
 import styled from "styled-components";
 import { useI18n } from "@/app/i18n";
-// COMMENTED OUT: Backend API calls
-// import { logout as apiLogout, me } from "@/services/auth";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/app/toast";
+import { useAuth } from "@/hooks/useAuth";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import SessionList, {
   type Session,
 } from "@/components/common/chat/SessionList";
-// COMMENTED OUT: Backend session API
-// import {
-//   listSessions,
-//   renameSession as apiRename,
-//   deleteSession as apiDelete,
-//   type ChatSession,
-// } from "@/services/sessions";
 import SearchSessionsModal from "@/components/common/chat/SearchSessionsModal";
 
 // DEMO: Local ChatSession type definition
@@ -41,6 +33,7 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
   const location = useLocation() as any;
   const { pathname, state } = location;
   const { notify } = useToast();
+  const { logout: performLogout } = useAuth();
 
   // COMMENTED OUT: No user auth needed
   // const [userId, setUserId] = useState<string | null>(null);
@@ -138,44 +131,10 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     }));
   }, [sessions, t, activeId]);
 
-  // DEMO: Logout just clears local data (no backend call)
-  const handleLogout = async () => {
-    try {
-      // Clear local demo data
-      sessionStorage.clear();
-      localStorage.removeItem("demo-sessions");
-      
-      notify({ title: "Demo", content: "Local data cleared (no real logout)", tone: "info" });
-      
-      // Just refresh the page or stay on home
-      nav("/", { replace: true });
-    } catch (e: any) {
-      notify({
-        title: t("error"),
-        content: e?.message || "Error clearing data",
-        tone: "error",
-      });
-    }
+  const handleLogout = () => {
+    performLogout();
   };
 
-  // COMMENTED OUT: Real backend logout
-  // const handleLogout = async () => {
-  //   try {
-  //     await apiLogout();
-  //     try {
-  //       sessionStorage.clear();
-  //       localStorage.removeItem("me");
-  //     } catch {}
-  //     notify({ title: t("signin"), content: t("signedOut"), tone: "info" });
-  //     nav("/signin", { replace: true });
-  //   } catch (e: any) {
-  //     notify({
-  //       title: t("error"),
-  //       content: e?.response?.data?.detail || e?.message,
-  //       tone: "error",
-  //     });
-  //   }
-  // };
   const go = (to: string) => () => nav(to);
 
   const onNewChat = () => {
@@ -318,7 +277,7 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     <Wrap data-collapsed={collapsed ? "true" : "false"} $bg={SIDEBAR_BG}>
       {/* Header */}
       <div className="head">
-        <button className="logo" onClick={go("/")} aria-label="Home">
+        <button className="logo" onClick={go("/app")} aria-label="Home">
           <img src={LOGO} alt="Logo" className="logo-img" />
           <span className="brand-name">ReelsAI</span>
         </button>
@@ -1162,11 +1121,6 @@ const SvgHome = (p: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const SvgChat = (p: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-  </svg>
-);
 
 const SvgPen = (p: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>

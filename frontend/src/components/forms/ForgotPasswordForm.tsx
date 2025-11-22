@@ -1,41 +1,51 @@
-import React, { useState } from "react";
+import React from "react";
 import styled from "styled-components";
+import { useForm } from "react-hook-form";
 import { useI18n } from "@/app/i18n";
 import Button from "@/components/common/buttons/Button";
 
 type Props = {
-  onSubmit: (email: string) => void;
+  onSubmit: (data: { email: string }) => void;
   loading?: boolean;
+};
+
+type ForgotPasswordFormData = {
+  email: string;
 };
 
 const ForgotForm: React.FC<Props> = ({ onSubmit, loading }) => {
   const { t } = useI18n();
-  const [email, setEmail] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ForgotPasswordFormData>();
 
   return (
     <StyledWrapper>
       <section className="container">
         <header>{t("resetTitle")}</header>
 
-        <form
-          className="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit(email.trim());
-          }}
-        >
+        <form className="form" onSubmit={handleSubmit(onSubmit)}>
           <div className="input-box">
             <label>{t("email")}</label>
             <input
-              required
               type="email"
-              placeholder="Email của bạn"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email"
+              {...register("email", {
+                required: "Email is required",
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: "Invalid email address",
+                },
+              })}
             />
+            {errors.email && (
+              <span className="error">{errors.email.message}</span>
+            )}
           </div>
 
-          <Button type="submit" wfull size="md" disabled={!!loading}>
+          <Button type="submit" wfull size="md" loading={loading} disabled={loading}>
             {t("resetBtn")}
           </Button>
         </form>
@@ -103,6 +113,12 @@ const StyledWrapper = styled.div`
   }
   .input-box input:focus {
     border-color: ${({ theme }) => theme.colors.accent};
-    box-shadow: 0 0 0 3px rgba(206, 122, 88, 0.2);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2);
+  }
+  .error {
+    display: block;
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 4px;
   }
 `;

@@ -1,72 +1,42 @@
-import { useState } from "react";
 import styled from "styled-components";
-// COMMENTED OUT: Backend register API
-// import { register } from "@/services/auth";
 import SignupForm from "@/components/forms/SignupForm";
 import { Link } from "react-router-dom";
-import LoaderPage from "@/components/common/loaders/LoaderPage";
-import { useToast } from "@/app/toast";
 import { useI18n } from "@/app/i18n";
 import ThreeDBackground from "@/components/common/ThreeDBackground";
-// COMMENTED OUT: Error formatter
-// import { formatError } from "@/utils/formatError";
+import { useAuth } from "@/hooks/useAuth";
+import type { RegisterRequest } from "@/types/auth";
 
 export default function SignUp() {
-  const [loading, setLoading] = useState(false);
-  const { notify } = useToast();
+  const { register: registerUser, isRegistering } = useAuth();
   const { t } = useI18n();
 
-  const submit = async ({
-    email,
-    password,
-    fullName,
-  }: {
-    email: string;
-    password: string;
-    fullName: string;
-  }) => {
-    setLoading(true);
-    
-    // DEMO: Simulate signup without backend
-    setTimeout(() => {
-      notify({ title: "Demo Signup", content: `Account created for ${fullName}`, tone: "success" });
-      setLoading(false);
-      // Navigate to check-email page
-      window.location.href = `/check-email?mode=verify&email=${encodeURIComponent(email)}`;
-    }, 1000);
+  const handleSubmit = (data: RegisterRequest) => {
+    registerUser(data);
   };
 
   return (
     <Wrap>
-      {loading ? (
-        <div className="loaderWrapper">
-          <LoaderPage />
+      {/* Left Side - 3D Interactive Background */}
+      <div className="leftSide">
+        <ThreeDBackground />
+        <div className="content">
+          <h1 className="brand">ReelsAI</h1>
+          <p className="tagline">Join thousands of users today</p>
         </div>
-      ) : (
-        <>
-          {/* Left Side - 3D Interactive Background */}
-          <div className="leftSide">
-            <ThreeDBackground />
-            <div className="content">
-              <h1 className="brand">ReelsAI</h1>
-              <p className="tagline">Join thousands of users today</p>
-            </div>
-          </div>
+      </div>
 
-          {/* Right Side - Form */}
-          <div className="rightSide">
-            <div className="formContainer">
-              <SignupForm onSubmit={submit} loading={loading} />
-              <div className="links">
-                <span className="muted">{t("haveAccount")}</span>
-                <Link to="/signin" className="cta">
-                  {t("signin")}
-                </Link>
-              </div>
-            </div>
+      {/* Right Side - Form */}
+      <div className="rightSide">
+        <div className="formContainer">
+          <SignupForm onSubmit={handleSubmit} loading={isRegistering} />
+          <div className="links">
+            <span className="muted">{t("haveAccount")}</span>
+            <Link to="/auth/sign-in" className="cta">
+              {t("signin")}
+            </Link>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </Wrap>
   );
 }
@@ -76,15 +46,6 @@ const Wrap = styled.div`
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  
-  /* Loader Wrapper - Full screen centered */
-  .loaderWrapper {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-  }
   
   /* Left Side - Animated Background */
   .leftSide {

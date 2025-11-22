@@ -85,7 +85,7 @@ const MOCK_POSTS = [
 ];
 
 export default function NewsfeedPage() {
-  const { t } = useI18n();
+  useI18n();
   const [promptValue, setPromptValue] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [posts] = useState(MOCK_POSTS);
@@ -298,7 +298,7 @@ const Container = styled.div`
 const FloatingFilter = styled.div`
   position: fixed;
   top: 24px;
-  left: 300px;
+  left: calc(var(--sidebar-width, 280px) + 20px);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -330,8 +330,8 @@ const FloatingFilter = styled.div`
     max-width: none;
   }
 
-  @media (max-width: 768px) {
-    top: 16px;
+  @media (max-width: 980px) {
+    top: 72px; /* Below hamburger button (64px + 8px gap) */
     left: 16px;
     right: 16px;
     padding: 16px 18px;
@@ -385,15 +385,6 @@ const ActiveFilterBox = styled.div`
   }
 `;
 
-const FilterLabel = styled.span`
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: ${({ theme }) => theme.colors.accent};
-  flex-shrink: 0;
-  padding-top: 2px;
-`;
 
 const FilterText = styled.span`
   flex: 1;
@@ -546,9 +537,13 @@ const FeedColumn = styled.div`
   position: relative;
   z-index: 1;
 
+  @media (max-width: 980px) {
+    padding-top: 180px; /* Space for hamburger + FloatingFilter (72px + ~100px filter height + margin) */
+  }
+
   @media (max-width: 768px) {
     max-width: 100%;
-    padding: 16px 12px 32px;
+    padding: 180px 12px 32px;
     gap: 16px;
   }
 `;
