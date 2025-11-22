@@ -1,7 +1,7 @@
 from django.urls import path
-from .views import save_item_view
+from . import views
 
 urlpatterns = [
-    path("save/", save_item_view, name="save-item"),
-    # Sau này có thể thêm: path('list/', list_saved_items, ...)
+    path("save/", views.save_item_view, name="save-item"),
+    path("list/", views.list_saved_items, name="list_saved_items"),
 ]

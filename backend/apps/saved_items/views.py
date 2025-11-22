@@ -8,6 +8,11 @@ from apps.feed.models import SocialPost  # Import từ feeds
 from .models import UserSavedItem
 from .serializers import SaveItemRequestSerializer, SaveItemResponseSerializer
 from .tasks import push_to_rag_task
+from .serializers import SavedItemSerializer
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(
@@ -52,3 +57,38 @@ def save_item_view(request):
 
     except SocialPost.DoesNotExist:
         return Response({"status": "error", "message": "Post not found"}, status=404)
+
+
+@extend_schema(
+    tags=["Saved Items"],
+    summary="List all saved content",
+    description="Retrieve a list of all content saved by the authenticated user, including full post details.",
+    responses={200: SavedItemSerializer(many=True), 401: "Unauthorized"},
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_saved_items(request):
+    """
+    Lấy danh sách các bài viết đã lưu của user hiện tại.
+    """
+    try:
+        # Sử dụng select_related('post') để join bảng feed_socialpost ngay trong 1 query
+        items = (
+            UserSavedItem.objects.filter(user=request.user)
+            .select_related("post")
+            .order_by("-saved_at")
+        )
+
+        serializer = SavedItemSerializer(items, many=True)
+
+        return Response(
+            {"success": True, "count": items.count(), "results": serializer.data},
+            status=status.HTTP_200_OK,
+        )
+
+    except Exception as e:
+        logger.error(f"Error fetching saved items for user {request.user.id}: {e}")
+        return Response(
+            {"error": "Internal server error", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
