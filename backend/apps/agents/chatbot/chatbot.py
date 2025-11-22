@@ -23,7 +23,7 @@ from django.contrib.auth.models import User
             
 from apps.chatbot.models import ChatSession, ChatMessage
 from ..kg_constructor.config import get_openai_llm
-from ..kg_constructor.neo4j_client import Neo4jClient
+# from ..kg_constructor.neo4j_client import Neo4jClient
 from .messages import MessageValidator
 from .system_prompts import MAIN_SYSTEM_PROMPT
 from .tools import retrieve_and_answer
@@ -74,20 +74,14 @@ class Chatbot:
     LangGraph-based chatbot with RAG tool integration
     """
     
-    def __init__(self, llm=None, neo4j_client: Optional[Neo4jClient] = None, user: Optional[User] = None):
+    def __init__(self, 
+                 llm=None,
+                #  neo4j_client: Optional[Neo4jClient] = None, 
+                 user: Optional[User] = None):
         self.llm = llm or get_openai_llm(model="gpt-4o-mini")
-        self.neo4j_client = neo4j_client
+        # self.neo4j_client = neo4j_client
         self.user = user
-        
-        # Initialize RAG components
-        # TODO: Implement RAGAgent and ContentRetriever classes
-        # self.rag_agent = RAGAgent(llm=self.llm, neo4j_client=neo4j_client)
-        # self.content_retriever = ContentRetriever(neo4j_client=neo4j_client)
-        
-        # Attach components to the tool function for access
-        # retrieve_and_answer._content_retriever = self.content_retriever
-        # retrieve_and_answer._rag_agent = self.rag_agent
-        
+                
         # Build LangGraph workflow
         self.workflow = self._build_workflow()
         
@@ -96,11 +90,6 @@ class Chatbot:
     def _get_checkpointer(self):
         """Get the appropriate checkpointer based on availability"""
         try:
-            # Use MemorySaver for now to avoid PostgresSaver serialization issues
-            # The Django database handles persistence via _save_to_database_node
-            logger.info("Using MemorySaver for LangGraph checkpoints")
-            return MemorySaver()
-            
             # Get database connection string from Django settings
             db_settings = connection.settings_dict
             
@@ -114,15 +103,7 @@ class Chatbot:
             checkpointer = PostgresSaver.from_conn_string(db_url)
             
             # Setup tables if they don't exist
-            # Use with statement to handle setup properly
-            with checkpointer.setup() as setup:
-                if hasattr(setup, '__enter__'):
-                    setup.__enter__()
-                    setup.__exit__(None, None, None)
-                else:
-                    # If setup is not a context manager, try calling it directly
-                    if callable(setup):
-                        setup()
+            checkpointer.setup()
             
             logger.info("Using PostgresSaver for persistent checkpoints")
             return checkpointer
@@ -220,8 +201,8 @@ class Chatbot:
     
     def _save_to_database_node(self, state: ChatState) -> Dict[str, Any]:
         """
-        Save chat messages to Django database for application use.
-        This is separate from PostgresSaver which handles LangGraph state persistence.
+        Update UI metadata only - PostgresSaver handles conversation persistence.
+        This maintains Django session info for UI features without duplicating messages.
         """
         try:
             try:
@@ -230,70 +211,44 @@ class Chatbot:
                 logger.error(f"User with ID {state.get('user_id')} not found")
                 return {"messages": []}
             
+            # Get or create session for UI purposes
             session, created = ChatSession.objects.get_or_create(
                 session_id=state.get("session_id"),
                 defaults={
-                    'user_id': state.get("user_id"),
+                    'user': user,
                     'title': self._generate_session_title(state["messages"])
                 }
             )
             
-            # Get the latest messages that haven't been saved yet
-            # Check what's already in database to avoid duplicates
-            existing_count = ChatMessage.objects.filter(session=session).count()
-            new_messages = state["messages"][existing_count:]
+            # Update session metadata for UI analytics (no message duplication)
+            if not created:
+                # Check if tools were used in this interaction
+                tool_used = any(msg.type == "tool" for msg in state["messages"])
+                
+                # Update context with interaction metadata
+                session.context = session.context or {}
+                session.context.update({
+                    "last_interaction": datetime.now().isoformat(),
+                    "workflow_type": "langgraph_tool",
+                    "used_rag_tool": tool_used
+                })
+                
+                # Increment message count for UI display (count user messages)
+                user_message_count = sum(1 for msg in state["messages"] if msg.type == "human")
+                session.message_count = user_message_count
+                session.save(update_fields=['context', 'message_count', 'updated_at'])
+                
+                # Generate title if this is early in the conversation
+                if not session.title and session.message_count <= 2:
+                    session.title = self._generate_session_title(state["messages"])
+                    session.save(update_fields=['title'])
             
-            # Save new messages
-            with transaction.atomic():
-                for message in new_messages:
-                    # Skip tool messages as they're internal
-                    if message.type == "tool":
-                        continue
-                        
-                    # Determine metadata based on message context
-                    metadata = {
-                        "workflow_type": "langgraph_tool"
-                    }
-                    
-                    # Check if this is a response that used tools
-                    used_rag = False
-                    tool_calls = False
-                    confidence = None
-                    task_type = None
-                    
-                    if message.type == "ai":
-                        # Check for tool calls in this message
-                        tool_calls = bool(getattr(message, 'tool_calls', None))
-                        
-                        # Check if there are recent tool messages before this AI message
-                        message_index = state["messages"].index(message)
-                        for i in range(max(0, message_index - 3), message_index):
-                            if state["messages"][i].type == "tool":
-                                used_rag = True
-                                break
-                        
-                        confidence = 0.9 if used_rag else 0.7
-                        task_type = "langgraph_rag_tool" if used_rag else "general_chat"
-                    
-                    ChatMessage.objects.create(
-                        session=session,
-                        message_type=message.type,
-                        content=message.content,
-                        used_rag_tool=used_rag,
-                        tool_calls_made=tool_calls,
-                        confidence=confidence,
-                        task_type=task_type,
-                        metadata=metadata
-                    )
-            
-            # Update session timestamp
-            session.save(update_fields=['updated_at'])
-            
-            logger.info(f"Saved {len(new_messages)} messages to database for session {state.get('session_id')}")
-            return {"messages": new_messages}
+            logger.info(f"UI metadata updated for session {state.get('session_id')}")
+            return {"messages": []}
             
         except Exception as e:
-            logger.error(f"Failed to save messages to database: {e}")
+            logger.error(f"UI metadata update failed: {e}")
+            # Don't fail the workflow if metadata update fails
             return {"messages": []}
     
     def _generate_session_title(self, messages: List) -> str:

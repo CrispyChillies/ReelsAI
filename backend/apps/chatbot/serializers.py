@@ -104,19 +104,45 @@ class SessionListSerializer(serializers.ModelSerializer):
             'last_message_preview'
         ]
     
-    def get_message_count(self, obj):
+    def get_message_count(self, obj) -> int:
         """Get the number of messages in this session"""
         return obj.messages.count()
     
-    def get_last_message_timestamp(self, obj):
+    def get_last_message_timestamp(self, obj) -> str:
         """Get timestamp of the last message"""
         last_message = obj.messages.last()
-        return last_message.timestamp if last_message else None
+        return last_message.timestamp.isoformat() if last_message else None
     
-    def get_last_message_preview(self, obj):
+    def get_last_message_preview(self, obj) -> str:
         """Get a preview of the last message"""
         last_message = obj.messages.last()
         if last_message:
             content = last_message.content
             return content[:100] + "..." if len(content) > 100 else content
         return None
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    """Serializer for error responses"""
+    error = serializers.CharField()
+    details = serializers.CharField(required=False)
+
+
+class DeleteSessionResponseSerializer(serializers.Serializer):
+    """Serializer for delete session response"""
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    deleted_messages = serializers.IntegerField()
+
+
+class GetSessionMessagesResponseSerializer(serializers.Serializer):
+    """Serializer for get session messages response"""
+    session_id = serializers.CharField()
+    message_count = serializers.IntegerField()
+    messages = ChatMessageSerializer(many=True)
+
+
+class ListSessionsResponseSerializer(serializers.Serializer):
+    """Serializer for list sessions response"""
+    session_count = serializers.IntegerField()
+    sessions = SessionListSerializer(many=True)

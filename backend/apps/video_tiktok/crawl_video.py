@@ -1,6 +1,7 @@
 import requests
 import json
 from apify_client import ApifyClient
+from django.conf import settings
 
 # =================== THÔNG SỐ ===================
 APIFY_TOKEN = 'apify_api_O9utrfdHHQynT83hW0sGydxQ3DVX4s33av3b'
@@ -16,7 +17,7 @@ print(" Apify Client đã khởi tạo thành công.")
 headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
 top_hashtags = []
 for industry_id in INDUSTRY_IDS:
-    api_url = f"http://127.0.0.1:8000/api/top-hashtags/?industry_id={industry_id}"
+    api_url = f"{settings.BACKEND_BASE_URL}/api/top-hashtags/?industry_id={industry_id}"
     try:
         response = requests.get(api_url, headers=headers)
         response.raise_for_status()

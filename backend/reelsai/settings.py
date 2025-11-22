@@ -107,9 +107,9 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "reelsai"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        "OPTIONS": {
-            "sslmode": os.getenv("DB_SSLMODE", "require"),
-        },
+        # "OPTIONS": {
+        #     "sslmode": os.getenv("DB_SSLMODE", "require"),
+        # },
     }
 }
 
@@ -225,10 +225,10 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Memoria")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Neo4j Configuration
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+# # Neo4j Configuration
+# NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+# NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
+# NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
 # Milvus Configuration
 ZILLIZ_URI = os.getenv("ZILLIZ_URI")

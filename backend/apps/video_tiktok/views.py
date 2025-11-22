@@ -3,6 +3,7 @@ from drf_spectacular.utils import (
     extend_schema, OpenApiExample, OpenApiParameter, OpenApiResponse
 )
 from django.http import JsonResponse
+from django.conf import settings
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
@@ -39,7 +40,7 @@ class GetVideosByIndustryView(APIView):
                 return JsonResponse({"error": "industry_id is required and must be an integer"}, status=400)
 
             # Lấy và lọc Hashtag ---
-            api_url = f"http://127.0.0.1:8000/api/top-hashtags/?industry_id={industry_id}"
+            api_url = f"{settings.BACKEND_BASE_URL}/api/top-hashtags/?industry_id={industry_id}"
             user_token = request.auth 
             headers = {"Authorization": f"Bearer {user_token}"}
             

@@ -25,10 +25,14 @@ from .serializers import (
     SendMessageSerializer, 
     SendMessageResponseSerializer,
     SessionListSerializer,
-    ChatMessageSerializer
+    ChatMessageSerializer,
+    ErrorResponseSerializer,
+    DeleteSessionResponseSerializer,
+    GetSessionMessagesResponseSerializer,
+    ListSessionsResponseSerializer
 )
 from ..agents.chatbot.chatbot import Chatbot, ChatRequest
-from ..agents.kg_constructor.neo4j_client import Neo4jClient
+# from ..agents.kg_constructor.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +48,9 @@ logger = logging.getLogger(__name__)
     request=SendMessageSerializer,
     responses={
         200: SendMessageResponseSerializer,
-        400: 'Bad Request - Invalid input',
-        401: 'Unauthorized - Authentication required',
-        500: 'Internal Server Error'
+        400: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+        500: ErrorResponseSerializer
     },
     parameters=[
         OpenApiParameter(
@@ -98,9 +102,9 @@ def send_message(request):
         
         # Initialize chatbot
         try:
-            neo4j_client = Neo4jClient()
+            # neo4j_client = Neo4jClient()
             chatbot = Chatbot(
-                neo4j_client=neo4j_client,
+                # neo4j_client=neo4j_client,
                 user=request.user
             )
         except Exception as e:
@@ -200,9 +204,9 @@ def send_message(request):
     Returns messages in chronological order with metadata.
     ''',
     responses={
-        200: ChatMessageSerializer(many=True),
-        401: 'Unauthorized - Authentication required',
-        404: 'Session not found'
+        200: GetSessionMessagesResponseSerializer,
+        401: ErrorResponseSerializer,
+        404: ErrorResponseSerializer
     },
     parameters=[
         OpenApiParameter(
@@ -258,9 +262,9 @@ def get_session_messages(request, session_id):
     This action is irreversible.
     ''',
     responses={
-        200: 'Session deleted successfully',
-        401: 'Unauthorized - Authentication required', 
-        404: 'Session not found'
+        200: DeleteSessionResponseSerializer,
+        401: ErrorResponseSerializer, 
+        404: ErrorResponseSerializer
     },
     parameters=[
         OpenApiParameter(
@@ -315,8 +319,8 @@ def delete_session(request, session_id):
     Includes session metadata and message previews.
     ''',
     responses={
-        200: SessionListSerializer(many=True),
-        401: 'Unauthorized - Authentication required'
+        200: ListSessionsResponseSerializer,
+        401: ErrorResponseSerializer
     }
 )
 @api_view(['GET'])

@@ -10,7 +10,7 @@ from django.db import transaction
 
 from apps.chatbot.models import ChatSession, ChatMessage
 from apps.agents.chatbot.chatbot import Chatbot, ChatRequest
-from apps.agents.kg_constructor.neo4j_client import Neo4jClient
+# from apps.agents.kg_constructor.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +65,10 @@ class Command(BaseCommand):
         
         # Initialize chatbot
         try:
-            neo4j_client = Neo4jClient()
-            chatbot = Chatbot(neo4j_client=neo4j_client, user=user)
+            # neo4j_client = Neo4jClient()
+            chatbot = Chatbot(
+                # neo4j_client=neo4j_client,
+                user=user)
             self.stdout.write(self.style.SUCCESS("✅ Chatbot initialized successfully"))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Failed to initialize chatbot: {e}"))
