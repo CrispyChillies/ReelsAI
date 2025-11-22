@@ -33,4 +33,6 @@ urlpatterns = [
         name="swagger-ui",
     ),
     path("api/", include("apps.feed.urls")),
+    path("api/", include("apps.saved_items.urls")),  # API /save
+    path("api/rag/", include("apps.rag.urls")),
 ]

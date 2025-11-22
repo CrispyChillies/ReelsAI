@@ -116,6 +116,7 @@ def _process_bluesky(feed, criteria):
                             post=post_obj,
                             ai_score=rating["score"],
                             ai_reasoning=rating["reasoning"],
+                            ai_summary=rating.get("summary", ""),
                         )
 
             except Exception as e:

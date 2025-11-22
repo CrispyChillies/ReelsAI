@@ -1,17 +1,21 @@
 from django.db import models
+from django.contrib.auth.models import User
+from apps.feed.models import SocialPost  # Import từ app feeds (Cross-app relationship)
 
 
-# Nếu bạn dùng Supabase thì không cần model này
-# Nhưng tốt nhất nên có để Django admin quản lý
 class UserSavedItem(models.Model):
-    user_id = models.IntegerField()
-    content_id = models.IntegerField()
-    saved_at = models.DateTimeField(auto_now_add=True)
-    tags = models.JSONField(default=list, blank=True)
-    rating = models.IntegerField(default=4)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="saved_items")
+
+    # Liên kết sang bảng SocialPost ở app feeds
+    post = models.ForeignKey(SocialPost, on_delete=models.CASCADE)
+
     is_favorite = models.BooleanField(default=True)
-    notes = models.TextField(blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    user_notes = models.TextField(blank=True, null=True)
+
+    is_rag_indexed = models.BooleanField(default=False)
+    saved_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "user_saved_items"
-        unique_together = ["user_id", "content_id"]
+        unique_together = ("user", "post")
+        ordering = ["-saved_at"]

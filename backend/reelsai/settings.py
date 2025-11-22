@@ -241,7 +241,7 @@ RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5672"))
 
 # Service API URLs
-SERVICE_API_URLS = {
+SERVICE_URLS = {
     "VIDEO_UNDERSTANDING_API_URL": os.getenv("VIDEO_UNDERSTANDING_API_URL"),
     "RAG_API_URL": os.getenv("RAG_API_URL"),
 }

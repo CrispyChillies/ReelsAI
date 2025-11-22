@@ -1,12 +1,16 @@
 from rest_framework import serializers
+from .models import UserSavedItem
 
 
 class SaveItemRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
-    content_id = serializers.IntegerField()
+    social_post_id = serializers.IntegerField()
+    tags = serializers.ListField(
+        child=serializers.CharField(), required=False, default=[]
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class SaveItemResponseSerializer(serializers.Serializer):
     status = serializers.CharField()
     message = serializers.CharField()
-    data = serializers.DictField(required=False)
+    saved_id = serializers.IntegerField()
