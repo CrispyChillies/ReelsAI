@@ -146,3 +146,20 @@ class ListSessionsResponseSerializer(serializers.Serializer):
     """Serializer for list sessions response"""
     session_count = serializers.IntegerField()
     sessions = SessionListSerializer(many=True)
+
+class RenameSessionSerializer(serializers.Serializer):
+    """Serializer for renaming a chat session"""
+    title = serializers.CharField(
+        max_length=100,
+        min_length=1,
+        help_text="New title for the chat session (1-100 characters)"
+    )
+
+
+class RenameSessionResponseSerializer(serializers.Serializer):
+    """Serializer for rename session response"""
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    session_id = serializers.CharField()
+    old_title = serializers.CharField()
+    new_title = serializers.CharField()
