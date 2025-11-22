@@ -224,19 +224,11 @@ class Chatbot:
             if not created:
                 # Check if tools were used in this interaction
                 tool_used = any(msg.type == "tool" for msg in state["messages"])
-                
-                # Update context with interaction metadata
-                session.context = session.context or {}
-                session.context.update({
-                    "last_interaction": datetime.now().isoformat(),
-                    "workflow_type": "langgraph_tool",
-                    "used_rag_tool": tool_used
-                })
-                
+                                
                 # Increment message count for UI display (count user messages)
                 user_message_count = sum(1 for msg in state["messages"] if msg.type == "human")
                 session.message_count = user_message_count
-                session.save(update_fields=['context', 'message_count', 'updated_at'])
+                session.save(update_fields=['message_count', 'updated_at'])
                 
                 # Generate title if this is early in the conversation
                 if not session.title and session.message_count <= 2:
