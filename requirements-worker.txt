@@ -1,0 +1,21 @@
+# Core Django & Celery
+django>=5.0
+celery>=5.3
+redis>=5.0
+psycopg2-binary>=2.9
+
+# AI & Processing (Worker thực hiện việc này nên KHÔNG ĐƯỢC BỎ)
+openai
+google-generativeai
+langchain
+langchain-openai
+apify-client
+atproto
+pymilvus
+neo4j
+
+# Video Processing (Dùng bản headless nhẹ hơn bản thường)
+opencv-python-headless
+moviepy
+requests
+python-dotenv
