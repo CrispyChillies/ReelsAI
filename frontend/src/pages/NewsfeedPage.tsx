@@ -89,14 +89,87 @@ import type { PersonalFeed } from "@/services/newsfeedService";
 export default function NewsfeedPage() {
   useI18n();
   const [promptValue, setPromptValue] = useState("");
-  const [activeFilter, setActiveFilter] = useState("");
-  const [currentFeedId, setCurrentFeedId] = useState<number | null>(null);
-  const [savedPostIds, setSavedPostIds] = useState<Set<number>>(new Set());
-  const [isPolling, setIsPolling] = useState(false);
+  
+  // Restore state from sessionStorage
+  const [activeFilter, setActiveFilter] = useState(() => {
+    try {
+      return sessionStorage.getItem('newsfeed_activeFilter') || '';
+    } catch {
+      return '';
+    }
+  });
+  
+  const [currentFeedId, setCurrentFeedId] = useState<number | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('newsfeed_currentFeedId');
+      return stored ? parseInt(stored, 10) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  const [savedPostIds, setSavedPostIds] = useState<Set<number>>(() => {
+    try {
+      const stored = sessionStorage.getItem('newsfeed_savedPostIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  
+  const [isPolling, setIsPolling] = useState(() => {
+    try {
+      return sessionStorage.getItem('newsfeed_isPolling') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { createFeed, isCreatingFeed, refreshFeed } = useNewsfeed();
   const { savePost, isSaving } = useSavePost();
+  
+  // Persist state to sessionStorage
+  useEffect(() => {
+    try {
+      if (activeFilter) {
+        sessionStorage.setItem('newsfeed_activeFilter', activeFilter);
+      } else {
+        sessionStorage.removeItem('newsfeed_activeFilter');
+      }
+    } catch (e) {
+      console.error('Failed to save activeFilter:', e);
+    }
+  }, [activeFilter]);
+
+  useEffect(() => {
+    try {
+      if (currentFeedId !== null) {
+        sessionStorage.setItem('newsfeed_currentFeedId', currentFeedId.toString());
+      } else {
+        sessionStorage.removeItem('newsfeed_currentFeedId');
+      }
+    } catch (e) {
+      console.error('Failed to save currentFeedId:', e);
+    }
+  }, [currentFeedId]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('newsfeed_savedPostIds', JSON.stringify(Array.from(savedPostIds)));
+    } catch (e) {
+      console.error('Failed to save savedPostIds:', e);
+    }
+  }, [savedPostIds]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('newsfeed_isPolling', isPolling.toString());
+    } catch (e) {
+      console.error('Failed to save isPolling:', e);
+    }
+  }, [isPolling]);
   
   // Fetch feed items with polling every 5 seconds when we have a feed
   const { data: feedItems = [], isLoading: isLoadingItems, isFetching } = useFeedItems(
@@ -142,6 +215,25 @@ export default function NewsfeedPage() {
       console.error('Failed to save post:', error);
     }
   };
+
+  // Listen for saved item removed events from other pages
+  useEffect(() => {
+    const handleItemRemoved = ((event: CustomEvent) => {
+      const { postId } = event.detail;
+      console.log('🔔 Event received: savedItemRemoved', postId);
+      // Remove the post ID from saved items
+      setSavedPostIds(prev => {
+        const newSet = new Set(prev);
+        const hadItem = newSet.has(postId);
+        newSet.delete(postId);
+        console.log('🗑️ Removing postId from savedPostIds:', { postId, hadItem, newSize: newSet.size });
+        return newSet;
+      });
+    }) as EventListener;
+
+    window.addEventListener('savedItemRemoved', handleItemRemoved);
+    return () => window.removeEventListener('savedItemRemoved', handleItemRemoved);
+  }, []);
 
   const handleManualRefresh = () => {
     if (currentFeedId) {
@@ -224,10 +316,8 @@ export default function NewsfeedPage() {
             rows={1}
           />
         )}
-      </FloatingFilter>
-
-      <FeedColumn>
-        {/* Polling indicator */}
+        
+        {/* Polling indicator inside filter box */}
         {isPolling && currentFeedId && (
           <PollingIndicator>
             <PollingDot $isActive={isFetching} />
@@ -246,6 +336,9 @@ export default function NewsfeedPage() {
             </StopPollingButton>
           </PollingIndicator>
         )}
+      </FloatingFilter>
+
+      <FeedColumn>
 
         {isLoadingItems && currentFeedId && (
           <LoadingState>
@@ -393,13 +486,6 @@ export default function NewsfeedPage() {
                     Why this post?
                   </AILabel>
                   <AIReasoningText>{item.ai_reasoning}</AIReasoningText>
-                  <AIScore>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                      <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    AI Score: {(item.ai_score * 100).toFixed(0)}%
-                  </AIScore>
                 </AIReasoning>
               )}
             </PostCard>
@@ -942,23 +1028,14 @@ const SourceLinkButton = styled.a`
 `;
 
 const PollingIndicator = styled.div`
-  position: sticky;
-  top: 24px;
-  z-index: 99;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, rgba(13, 148, 136, 0.06) 0%, rgba(13, 148, 136, 0.03) 100%);
   border: 1px solid rgba(13, 148, 136, 0.15);
-  border-radius: 12px;
-  margin-bottom: 20px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.1);
-  
-  @media (max-width: 980px) {
-    top: 180px; /* Below FloatingFilter on mobile */
-  }
+  border-radius: 10px;
+  margin-top: 12px;
 `;
 
 const PollingDot = styled.div<{ $isActive: boolean }>`
@@ -1162,18 +1239,4 @@ const AIReasoningText = styled.p`
   color: ${({ theme }) => theme.colors.secondary};
   font-style: italic;
   margin: 6px 0;
-`;
-
-const AIScore = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 4px 12px;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #059669;
 `;

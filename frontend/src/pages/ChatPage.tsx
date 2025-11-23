@@ -5,10 +5,8 @@ import ChatMessage from "@/components/common/chat/ChatMessage";
 import LoaderTyping from "@/components/common/loaders/LoaderTyping";
 import FloatingParticles from "@/components/common/FloatingParticles";
 import { useI18n } from "@/app/i18n";
-// COMMENTED OUT: Backend API calls
-// import { me } from "@/services/auth";
-// import { startSession, streamChat, getHistory, autoNameSession } from "@/services/sessions";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useChatbot, useChatMessages } from "@/hooks/useChatbot";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
@@ -36,25 +34,45 @@ export default function ChatPage() {
   const isEmpty = messages.length === 0;
 
   // session & user
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  // COMMENTED OUT: User auth
-  // const [userId, setUserId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem("activeSessionId");
+    } catch {
+      return null;
+    }
+  });
   const location = useLocation() as any;
   const nav = useNavigate();
+  
+  // Use chatbot hooks
+  const { sendMessage } = useChatbot();
+  const { 
+    messages: apiMessages, 
+    fetchMessages, 
+    clearMessages 
+  } = useChatMessages(sessionId);
 
-  // COMMENTED OUT: Auth guard - no longer redirecting to signin
-  // --- Lấy user id + guard auth: nếu 401 thì về signin (replace:true để tránh quay lại bằng Back)
-  // useEffect(() => {
-  //   let alive = true;
-  //   me()
-  //     .then((u) => { if (alive) setUserId(u.id); })
-  //     .catch(() => {
-  //       try { sessionStorage.removeItem("activeSessionId"); } catch {}
-  //       nav("/signin", { replace: true });
-  //     });
-  //   return () => { alive = false; };
-  // }, []);
+  // Load messages when session ID changes
+  useEffect(() => {
+    if (sessionId) {
+      fetchMessages();
+    } else {
+      clearMessages();
+    }
+  }, [sessionId]);
 
+  // Convert API messages to UI format
+  useEffect(() => {
+    const converted: Msg[] = apiMessages
+      .filter(m => m.message_type === 'human' || m.message_type === 'ai')
+      .map(m => ({
+        id: m.id,
+        role: m.message_type === 'human' ? 'user' : 'assistant',
+        content: m.content,
+        metadata: m.metadata // Include metadata for images/videos/embeds
+      }));
+    setMessages(converted);
+  }, [apiMessages]);
 
   // --- Detect "new chat" bằng ?new=1 -> reset
   useEffect(() => {
@@ -62,6 +80,7 @@ export default function ChatPage() {
     if (sp.get("new") === "1") {
       setSessionId(null);
       setMessages([]);
+      clearMessages();
       // cleanup trạng thái active đã lưu
       sessionStorage.removeItem("activeSessionId");
       // bỏ ?new=1 khỏi url (đẹp URL)
@@ -72,37 +91,12 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
-  // COMMENTED OUT: Load history from backend when selecting session
-  // --- Nhận sessionId từ location.state khi chọn session
-  // useEffect(() => {
-  //   const sid = location?.state?.sessionId as string | undefined;
-  //   if (sid && sid !== sessionId) {
-  //     setSessionId(sid);
-  //     sessionStorage.setItem("activeSessionId", sid);
-  //     getHistory(sid)
-  //       .then(({ messages }) =>
-  //         setMessages(
-  //           messages.map((m) => ({
-  //             id: crypto.randomUUID(),
-  //             role: m.role,
-  //             content: m.content,
-  //           }))
-  //         )
-  //       )
-  //       .catch(() => {});
-  //     requestAnimationFrame(() => scrollToBottom(true));
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [location?.state?.sessionId]);
-
-  // DEMO: Handle session selection from sidebar (just update UI)
+  // Handle session selection from sidebar
   useEffect(() => {
     const sid = location?.state?.sessionId as string | undefined;
     if (sid && sid !== sessionId) {
       setSessionId(sid);
       sessionStorage.setItem("activeSessionId", sid);
-      // Clear messages for demo (or you can load from localStorage if you want persistence)
-      setMessages([]);
       requestAnimationFrame(() => scrollToBottom(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,26 +210,13 @@ export default function ChatPage() {
     scrollToBottom(false);
   };
 
-  // ---------------------- SEND & STREAM (DEMO MODE - NO BACKEND) ----------------------
+  // ---------------------- SEND MESSAGE WITH REAL API ----------------------
   const onSend = async (p: { prompt: string; rootUrl?: string }) => {
     if (!p?.prompt?.trim()) return;
     setTyping(true);
 
     try {
-      // DEMO: Create session ID if needed (client-side only)
-      let sid = sessionId;
-      if (!sid) {
-        // Generate a random session ID for demo
-        sid = `demo-session-${crypto.randomUUID()}`;
-        setSessionId(sid);
-        sessionStorage.setItem("activeSessionId", sid);
-        nav(location.pathname, {
-          state: { ...location.state, sessionId: sid },
-          replace: true,
-        });
-      }
-
-      // Add user message immediately
+      // Add user message to UI immediately (optimistic update)
       const uid = crypto.randomUUID();
       const aid = crypto.randomUUID();
       setMessages((prev) => [
@@ -244,105 +225,59 @@ export default function ChatPage() {
         { id: aid, role: "assistant", content: "" },
       ]);
 
-      // DEMO: Simulate AI response with typing effect (no backend)
-      const lowerPrompt = p.prompt.toLowerCase();
-      
-      // Check if user is asking for TikTok videos
-      const isTikTokRequest = 
-        lowerPrompt.includes("tiktok") || 
-        lowerPrompt.includes("video") ||
-        lowerPrompt.includes("recommend") ||
-        lowerPrompt.includes("suggest") ||
-        lowerPrompt.includes("show") ||
-        lowerPrompt.includes("trending") ||
-        lowerPrompt.includes("gợi ý") ||
-        lowerPrompt.includes("giới thiệu");
+      // Send message to backend
+      const response = await sendMessage({
+        message: p.prompt,
+        session_id: sessionId || undefined,
+      });
 
-      let demoResponse = "";
-      
-      if (isTikTokRequest) {
-        demoResponse = `Hey there! 👋\n\nI found **5 trending TikTok videos** that match your interests. These videos are currently getting lots of love:\n\n✨ **Diverse Content:**\n- Programming & Technology\n- Entertainment & News\n- Food & ASMR\n- Funny moments\n\nYou can:\n- 👁️ **View & Rate** - Swipe through each video like Tinder\n- ❤️ **Like** - Help me recommend better videos\n- 👎 **Dislike** - Skip videos you don't enjoy\n- 💾 **Download** - Save videos to your device\n\nLet me know which ones you like! 😊`;
-      } else {
-        demoResponse = `Thanks for reaching out! 💬\n\nI'm currently in demo mode and can help you with:\n\n🎬 **Discover trending TikTok videos**\n- Try asking: "Recommend TikTok videos for me"\n- Or: "Show me trending videos"\n- Or: "Any cool videos?"\n\nI'll find the best videos just for you! ✨\n\nWhat kind of videos are you looking for? 🎥`;
-      }
-      
-      let acc = "";
-      const words = demoResponse.split(" ");
-      
-      for (let i = 0; i < words.length; i++) {
-        acc += (i > 0 ? " " : "") + words[i];
+      if (response) {
+        // Update session ID if new session created
+        if (!sessionId && response.session_id) {
+          setSessionId(response.session_id);
+          sessionStorage.setItem("activeSessionId", response.session_id);
+          nav(location.pathname, {
+            state: { 
+              ...location.state, 
+              sessionId: response.session_id,
+              title: p.prompt.slice(0, 50) + (p.prompt.length > 50 ? "..." : "")
+            },
+            replace: true,
+          });
+        }
+
+        // Update assistant message with response
         setMessages((prev) =>
-          prev.map((m) => (m.id === aid ? { ...m, content: acc } : m))
+          prev.map((m) => 
+            m.id === aid ? { ...m, content: response.message } : m
+          )
         );
-        // Simulate streaming delay
-        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Reload messages to get full data from backend
+        if (response.session_id) {
+          await fetchMessages();
+        }
+      } else {
+        // Error occurred - show error message
+        setMessages((prev) =>
+          prev.map((m) => 
+            m.id === aid 
+              ? { ...m, content: "Sorry, I encountered an error. Please try again." } 
+              : m
+          )
+        );
       }
-
-      // DEMO: Auto-name session (client-side only)
-      if (messages.length === 0) {
-        const demoTitle = p.prompt.slice(0, 50) + (p.prompt.length > 50 ? "..." : "");
-        nav(location.pathname, {
-          state: { 
-            ...location.state, 
-            sessionId: sid,
-            title: demoTitle
-          },
-          replace: true,
-        });
-      }
-
-      // COMMENTED OUT: Real backend streaming
-      // // 1) Tạo session nếu đang new chat
-      // let sid = sessionId;
-      // if (!sid) {
-      //   if (!userId) {
-      //     setTyping(false);
-      //     return;
-      //   }
-      //   const s = await startSession();
-      //   sid = s.session_id;
-      //   setSessionId(sid);
-      //   sessionStorage.setItem("activeSessionId", sid);
-      //   nav(location.pathname, {
-      //     state: { ...location.state, sessionId: sid },
-      //     replace: true,
-      //   });
-      // }
-
-      // // 2) cập nhật UI ngay
-      // const uid = crypto.randomUUID();
-      // const aid = crypto.randomUUID();
-      // setMessages((prev) => [
-      //   ...prev,
-      //   { id: uid, role: "user", content: p.prompt },
-      //   { id: aid, role: "assistant", content: "" },
-      // ]);
-
-      // // 3) stream SSE
-      // let acc = "";
-      // await streamChat(sid!, p.prompt, (token) => {
-      //   acc += token;
-      //   setMessages((prev) =>
-      //     prev.map((m) => (m.id === aid ? { ...m, content: acc } : m))
-      //   );
-      // });
-
-      // // 4) Auto-name the session if this is the first message
-      // if (messages.length === 0) {
-      //   try {
-      //     const { title } = await autoNameSession(sid!);
-      //     nav(location.pathname, {
-      //       state: { 
-      //         ...location.state, 
-      //         sessionId: sid,
-      //         title: title
-      //       },
-      //       replace: true,
-      //     });
-      //   } catch (e) {
-      //     console.error("Failed to auto-name session:", e);
-      //   }
-      // }
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      // Show error in UI
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg && lastMsg.role === 'assistant') {
+          lastMsg.content = "Sorry, I encountered an error. Please try again.";
+        }
+        return updated;
+      });
     } finally {
       setTyping(false);
     }

@@ -10,9 +10,11 @@ from rest_framework.permissions import IsAuthenticated
 
 load_dotenv()
 
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 
 class GetTopHashtagsView(APIView):
     permission_classes = [IsAuthenticated]  
@@ -34,8 +36,11 @@ class GetTopHashtagsView(APIView):
             if not industry_id:
                 return JsonResponse({"error": "industry_id is required"}, status=400)
 
-            response = supabase.table("hashtags").select("*").eq("industry_id", industry_id).range(0, 100).execute()
+            # Fetch hashtags from Supabase
+            response = supabase.table("HASHTAGS").select("*").eq("industry_id", industry_id).execute()
             hashtags = response.data
+
+
 
             # Lọc hashtags theo quốc gia
             vietnam_hashtags = [h for h in hashtags if h['country_id'] == 'VN']
@@ -46,6 +51,7 @@ class GetTopHashtagsView(APIView):
             vietnam_hashtags = sorted(vietnam_hashtags, key=lambda x: x['views'], reverse=True)[:10]
             us_hashtags = sorted(us_hashtags, key=lambda x: x['views'], reverse=True)[:10]
             uk_hashtags = sorted(uk_hashtags, key=lambda x: x['views'], reverse=True)[:10]
+
 
             top_hashtags = vietnam_hashtags + us_hashtags + uk_hashtags
             top_hashtags = sorted(top_hashtags, key=lambda x: x['views'], reverse=True)[:20]

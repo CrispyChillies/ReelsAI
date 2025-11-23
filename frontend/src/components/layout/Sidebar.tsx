@@ -9,17 +9,8 @@ import SessionList, {
   type Session,
 } from "@/components/common/chat/SessionList";
 import SearchSessionsModal from "@/components/common/chat/SearchSessionsModal";
-
-// DEMO: Local ChatSession type definition
-type ChatSession = {
-  session_id: string;
-  user_id: string;
-  title?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  last_message_preview?: string | null;
-  messages_count: number;
-};
+import { useChatSessions } from "@/hooks/useChatbot";
+import type { ChatSession } from "@/types/chatbot";
 
 type Props = { collapsed: boolean; onToggle: () => void };
 
@@ -35,18 +26,16 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
   const { notify } = useToast();
   const { logout: performLogout } = useAuth();
 
-  // COMMENTED OUT: No user auth needed
-  // const [userId, setUserId] = useState<string | null>(null);
+  // Use real API hooks
+  const { 
+    sessions, 
+    isLoading, 
+    error, 
+    fetchSessions, 
+    deleteSession: apiDeleteSession,
+    renameSession: apiRenameSession
+  } = useChatSessions();
   
-  // DEMO: Use localStorage for sessions persistence
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    try {
-      const stored = localStorage.getItem("demo-sessions");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
   const [openSearch, setOpenSearch] = useState(false);
 
   // --- Active session id: ưu tiên location.state, fallback sessionStorage
@@ -69,59 +58,25 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
       sessionStorage.setItem("activeSessionId", activeIdFromState);
       setActiveId(activeIdFromState);
 
-      // Update title in local state immediately when it changes
+      // Refetch sessions when title updates to get latest data
       const newTitle = location?.state?.title;
       if (newTitle) {
-        setSessions((prev) => {
-          const updated = prev.map((s) =>
-            s.session_id === activeIdFromState ? { ...s, title: newTitle } : s
-          );
-          // Save to localStorage
-          localStorage.setItem("demo-sessions", JSON.stringify(updated));
-          return updated;
-        });
+        fetchSessions();
       }
     }
   }, [activeIdFromState, location?.state?.title]);
 
-  // COMMENTED OUT: No auth check needed
-  // useEffect(() => {
-  //   me()
-  //     .then((u) => setUserId(u.id))
-  //     .catch(() => {});
-  // }, []);
-
-  // DEMO: Create demo session if needed
+  // Load sessions on mount
   useEffect(() => {
-    const sid = location?.state?.sessionId;
-    if (sid && !sessions.find(s => s.session_id === sid)) {
-      const newSession: ChatSession = {
-        session_id: sid,
-        user_id: "demo-user",
-        title: location?.state?.title || t("newChat") || "New chat",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        messages_count: 0
-      };
-      setSessions(prev => {
-        const updated = [newSession, ...prev];
-        localStorage.setItem("demo-sessions", JSON.stringify(updated));
-        return updated;
-      });
-    }
-  }, [location?.state?.sessionId, location?.state?.title, sessions, t]);
+    fetchSessions();
+  }, []);
 
-  // COMMENTED OUT: Backend session loading
-  // // Refresh sessions when location state changes (for auto-naming)
-  // const locationTitle = location?.state?.title;
-  // useEffect(() => {
-  //   if (!userId) return;
-  //   listSessions()
-  //     .then(setSessions)
-  //     .catch((e) => {
-  //       console.error(e);
-  //     });
-  // }, [userId, pathname, activeId, locationTitle]);
+  // Refresh sessions when pathname or active session changes
+  useEffect(() => {
+    if (activeId) {
+      fetchSessions();
+    }
+  }, [pathname, activeId]);
 
   const items: Session[] = useMemo(() => {
     return sessions.map((s) => ({
@@ -159,11 +114,10 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
 
   // --- mở modal xác nhận xoá
   const onDelete = async (id: string) => {
-    // DEMO: No user check needed
     setDeleteTarget(id);
   };
 
-  // --- SUBMIT RENAME (DEMO - localStorage only)
+  // --- SUBMIT RENAME WITH REAL API
   const submitRename = async () => {
     if (!renameTarget) return;
     const next = renameTarget.value.trim();
@@ -171,17 +125,14 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     try {
       setBusy(true);
       
-      // DEMO: Update in localStorage instead of backend
-      setSessions((prev) => {
-        const updated = prev.map((s) =>
-          s.session_id === renameTarget.id ? { ...s, title: next } : s
-        );
-        localStorage.setItem("demo-sessions", JSON.stringify(updated));
-        return updated;
-      });
-      
-      setRenameTarget(null);
-      notify({ title: "Success", content: "Session renamed", tone: "success" });
+      const success = await apiRenameSession(renameTarget.id, next);
+      if (success) {
+        setRenameTarget(null);
+        notify({ title: t("success") || "Success", content: t("sessionRenamed") || "Session renamed", tone: "success" });
+        await fetchSessions(); // Refresh list
+      } else {
+        throw new Error("Failed to rename session");
+      }
     } catch (e: any) {
       notify({
         title: t("error"),
@@ -193,51 +144,25 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     }
   };
 
-  // COMMENTED OUT: Real backend rename
-  // const submitRename = async () => {
-  //   if (!renameTarget) return;
-  //   const next = renameTarget.value.trim();
-  //   if (!next) return;
-  //   try {
-  //     setBusy(true);
-  //     await apiRename(renameTarget.id, next);
-  //     setSessions((prev) =>
-  //       prev.map((s) =>
-  //         s.session_id === renameTarget.id ? { ...s, title: next } : s
-  //       )
-  //     );
-  //     setRenameTarget(null);
-  //   } catch (e: any) {
-  //     notify({
-  //       title: t("error"),
-  //       content: e?.response?.data?.detail || e?.message,
-  //       tone: "error",
-  //     });
-  //   } finally {
-  //     setBusy(false);
-  //   }
-  // };
-
-  // --- CONFIRM DELETE (DEMO - localStorage only)
+  // --- CONFIRM DELETE WITH REAL API
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
       setBusy(true);
       
-      // DEMO: Delete from localStorage instead of backend
-      setSessions((prev) => {
-        const updated = prev.filter((s) => s.session_id !== deleteTarget);
-        localStorage.setItem("demo-sessions", JSON.stringify(updated));
-        return updated;
-      });
-      
-      if (activeId === deleteTarget) {
-        sessionStorage.removeItem("activeSessionId");
-        setActiveId(null);
-        nav({ pathname: "/chat", search: "?new=1" });
+      const success = await apiDeleteSession(deleteTarget);
+      if (success) {
+        if (activeId === deleteTarget) {
+          sessionStorage.removeItem("activeSessionId");
+          setActiveId(null);
+          nav({ pathname: "/chat", search: "?new=1" });
+        }
+        setDeleteTarget(null);
+        notify({ title: t("success") || "Success", content: t("sessionDeleted") || "Session deleted", tone: "success" });
+        await fetchSessions(); // Refresh list
+      } else {
+        throw new Error("Failed to delete session");
       }
-      setDeleteTarget(null);
-      notify({ title: "Success", content: "Session deleted", tone: "success" });
     } catch (e: any) {
       notify({
         title: t("error"),

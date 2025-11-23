@@ -92,3 +92,30 @@ def list_saved_items(request):
             {"error": "Internal server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@extend_schema(
+    tags=["Saved Items"],
+    summary="Delete saved item",
+    description="Remove a saved item from the user's collection.",
+    responses={200: {"description": "Item deleted successfully"}, 404: "Item not found"},
+)
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_saved_item(request, item_id):
+    """
+    Xóa một item đã lưu của user.
+    """
+    try:
+        item = UserSavedItem.objects.get(id=item_id, user=request.user)
+        item.delete()
+        
+        return Response(
+            {"success": True, "message": "Item deleted successfully"},
+            status=status.HTTP_200_OK,
+        )
+    except UserSavedItem.DoesNotExist:
+        return Response(
+            {"error": "Item not found or you don't have permission to delete it"},
+            status=status.HTTP_404_NOT_FOUND,
+        )

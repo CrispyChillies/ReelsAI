@@ -1,106 +1,46 @@
-import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useI18n } from "@/app/i18n";
+import { useSavedItems } from "@/hooks/useSavedItems";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import { useState } from "react";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 
-// Import MOCK_POSTS from NewsfeedPage (in real app, this would be from a shared file)
-const MOCK_POSTS = [
-  {
-    id: "1",
-    platform: "tiktok",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=1",
-      username: "@cutecats.bsky.social",
-      displayName: "Cute Cats",
-    },
-    content: "Every day I get closer and closer to get a cat for my cat. 🐱💕",
-    timestamp: "35s",
-    stats: { likes: 88, comments: 16, shares: 70 },
-    thumbnail: null,
-  },
-  {
-    id: "2",
-    platform: "facebook",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=2",
-      username: "@mochidog.bsky.social",
-      displayName: "Mochi Dog",
-    },
-    content: "Good morning from the fluffiest boy! 🌞🐕",
-    timestamp: "5m",
-    stats: { likes: 3000, comments: 70000, shares: 3000 },
-    thumbnail: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400",
-  },
-  {
-    id: "3",
-    platform: "tiktok",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=3",
-      username: "@dannycat.bsky.social",
-      displayName: "Danny Cat",
-    },
-    content: "Miau! Look what I just did!! 😹",
-    timestamp: "1h",
-    stats: { likes: 1250, comments: 89, shares: 234 },
-    thumbnail: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400",
-  },
-  {
-    id: "4",
-    platform: "facebook",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=4",
-      username: "@foodlover.social",
-      displayName: "Food Lover",
-    },
-    content: "Just made the perfect pasta carbonara! Recipe in comments 🍝✨",
-    timestamp: "2h",
-    stats: { likes: 5420, comments: 312, shares: 891 },
-    thumbnail: "https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400",
-  },
-  {
-    id: "5",
-    platform: "tiktok",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=5",
-      username: "@travelbug.world",
-      displayName: "Travel Bug",
-    },
-    content: "Sunset in Santorini never gets old 🌅💙 #travel #greece",
-    timestamp: "3h",
-    stats: { likes: 12500, comments: 456, shares: 2100 },
-    thumbnail: "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=400",
-  },
-  {
-    id: "6",
-    platform: "facebook",
-    user: {
-      avatar: "https://i.pravatar.cc/150?img=6",
-      username: "@techguru.dev",
-      displayName: "Tech Guru",
-    },
-    content: "New AI model just dropped! This changes everything in computer vision 🤖💻",
-    timestamp: "5h",
-    stats: { likes: 8900, comments: 1200, shares: 3400 },
-    thumbnail: null,
-  },
-];
+dayjs.extend(relativeTime);
 
 export default function SavedContent() {
   const { t } = useI18n();
-  const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
-  const [savedPosts, setSavedPosts] = useState<typeof MOCK_POSTS>([]);
+  const { savedItems = [], loading, error, removeSavedItem } = useSavedItems();
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('saved-posts');
-    const ids = saved ? JSON.parse(saved) : [];
-    setSavedPostIds(ids);
-    setSavedPosts(MOCK_POSTS.filter(post => ids.includes(post.id)));
-  }, []);
+  console.log('SavedContent render:', { 
+    savedItems, 
+    isArray: Array.isArray(savedItems),
+    length: savedItems?.length,
+    type: typeof savedItems,
+    keys: savedItems ? Object.keys(savedItems) : 'null',
+    loading, 
+    error 
+  });
 
-  const handleRemove = (postId: string) => {
-    const newIds = savedPostIds.filter(id => id !== postId);
-    setSavedPostIds(newIds);
-    setSavedPosts(MOCK_POSTS.filter(post => newIds.includes(post.id)));
-    localStorage.setItem('saved-posts', JSON.stringify(newIds));
+  const handleRemoveClick = (itemId: number) => {
+    setItemToDelete(itemId);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (itemToDelete === null) return;
+    
+    try {
+      await removeSavedItem(itemToDelete);
+      setItemToDelete(null);
+    } catch (err) {
+      console.error('Failed to remove item:', err);
+      alert('Failed to remove item');
+    }
+  };
+
+  const handleCancelRemove = () => {
+    setItemToDelete(null);
   };
 
   function formatNumber(num: number): string {
@@ -109,14 +49,50 @@ export default function SavedContent() {
     return num.toString();
   }
 
+  if (loading) {
+    return (
+      <Container>
+        <Header>
+          <Title>{t("contentStorageTitle")}</Title>
+          <Subtitle>{t("loading") || "Loading"}...</Subtitle>
+        </Header>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Header>
+          <Title>{t("contentStorageTitle")}</Title>
+          <Subtitle style={{ color: '#ef4444' }}>{error}</Subtitle>
+        </Header>
+      </Container>
+    );
+  }
+
+  console.log('Rendering table with items:', savedItems.length);
+
   return (
-    <Container>
+    <>
+      <ConfirmModal
+        isOpen={itemToDelete !== null}
+        title={t("confirmRemoveTitle")}
+        message={t("confirmRemoveMessage")}
+        confirmText={t("confirmRemoveBtn")}
+        cancelText={t("cancel")}
+        onConfirm={handleConfirmRemove}
+        onCancel={handleCancelRemove}
+        type="danger"
+      />
+      
+      <Container>
       <Header>
         <Title>{t("contentStorageTitle")}</Title>
-        <Subtitle>{t("contentStorageSubtitle")} • {savedPosts.length} {t("savedItems")}</Subtitle>
+        <Subtitle>{t("contentStorageSubtitle")} • {savedItems.length} {t("savedItems")}</Subtitle>
       </Header>
 
-      {savedPosts.length === 0 ? (
+      {savedItems.length === 0 ? (
         <EmptyState>
           <EmptyIcon>
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -140,68 +116,93 @@ export default function SavedContent() {
               </tr>
             </thead>
             <tbody>
-              {savedPosts.map((post) => (
-                <Tr key={post.id}>
+              {Array.isArray(savedItems) && savedItems.map((item) => {
+                console.log('Rendering item:', item);
+                const post = item?.post;
+                if (!post) {
+                  console.error('Item missing post data:', item);
+                  return null;
+                }
+                
+                return (
+                <Tr key={item.id}>
                   <Td>
-                    <PlatformBadge platform={post.platform}>
+                    <PlatformBadge $platform={post.platform}>
                       {post.platform === "tiktok" ? (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
                         </svg>
                       ) : (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          <path d="M6.29 18.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0020 3.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.073 4.073 0 01.8 7.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 010 16.407a11.616 11.616 0 006.29 1.84"/>
                         </svg>
                       )}
-                      <span>{post.platform === "tiktok" ? "TikTok" : "Facebook"}</span>
+                      <span>{post.platform === "tiktok" ? "TikTok" : "Bluesky"}</span>
                     </PlatformBadge>
                   </Td>
                   <Td>
                     <AuthorCell>
-                      <Avatar src={post.user.avatar} alt={post.user.displayName} />
+                      <Avatar src={`https://i.pravatar.cc/150?u=${post.author}`} alt={post.author} />
                       <AuthorInfo>
-                        <AuthorName>{post.user.displayName}</AuthorName>
-                        <AuthorUsername>{post.user.username}</AuthorUsername>
+                        <AuthorName>{post.author}</AuthorName>
+                        {item.is_rag_indexed && <RAGBadge>🔍 Indexed</RAGBadge>}
                       </AuthorInfo>
                     </AuthorCell>
                   </Td>
                   <Td>
                     <ContentCell>
                       {post.content}
-                      {post.thumbnail && <ThumbnailIndicator>📷 {t("hasMedia")}</ThumbnailIndicator>}
+                      {post.media_url && <ThumbnailIndicator>📷 {t("hasMedia")}</ThumbnailIndicator>}
+                      {item.user_notes && <UserNotes>💭 {item.user_notes}</UserNotes>}
                     </ContentCell>
                   </Td>
                   <Td>
                     <EngagementCell>
                       <EngagementItem>
-                        <span>❤️</span> {formatNumber(post.stats.likes)}
+                        <span>❤️</span> {formatNumber(post.like_count || 0)}
                       </EngagementItem>
                       <EngagementItem>
-                        <span>💬</span> {formatNumber(post.stats.comments)}
+                        <span>💬</span> {formatNumber(post.reply_count || 0)}
                       </EngagementItem>
                       <EngagementItem>
-                        <span>📤</span> {formatNumber(post.stats.shares)}
+                        <span>🔁</span> {formatNumber(post.repost_count || 0)}
                       </EngagementItem>
                     </EngagementCell>
                   </Td>
                   <Td>
-                    <TimeCell>{post.timestamp}</TimeCell>
+                    <TimeCell>{dayjs(item.saved_at).fromNow()}</TimeCell>
                   </Td>
                   <Td>
-                    <ActionButton onClick={() => handleRemove(post.id)} title={t("remove")}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </ActionButton>
+                    <ActionsCell>
+                      {post.source_link && (
+                        <ViewButton 
+                          onClick={() => window.open(post.source_link!, '_blank')} 
+                          title={t("viewPost") || "View post"}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                        </ViewButton>
+                      )}
+                      <ActionButton onClick={() => handleRemoveClick(item.id)} title={t("remove")}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </ActionButton>
+                    </ActionsCell>
                   </Td>
                 </Tr>
-              ))}
+                );
+              })}
             </tbody>
           </Table>
         </TableWrapper>
       )}
     </Container>
+    </>
   );
 }
 
@@ -337,14 +338,14 @@ const Td = styled.td`
   vertical-align: top;
 `;
 
-const PlatformBadge = styled.div<{ platform: string }>`
+const PlatformBadge = styled.div<{ $platform: string }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
-  background: ${({ platform }) => 
-    platform === "tiktok" 
+  background: ${({ $platform }) => 
+    $platform === "tiktok" 
       ? "linear-gradient(135deg, #00f2ea 0%, #ff0050 100%)" 
       : "linear-gradient(135deg, #1877f2 0%, #0a66c2 100%)"
   };
@@ -379,9 +380,24 @@ const AuthorName = styled.div`
   font-size: 0.9rem;
 `;
 
-const AuthorUsername = styled.div`
-  font-size: 0.8rem;
+const RAGBadge = styled.div`
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.accent};
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const UserNotes = styled.div`
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(13, 148, 136, 0.05);
+  border-left: 3px solid ${({ theme }) => theme.colors.accent};
+  border-radius: 4px;
+  font-size: 0.85rem;
   color: ${({ theme }) => theme.colors.secondary};
+  font-style: italic;
 `;
 
 const ContentCell = styled.div`
@@ -417,6 +433,44 @@ const TimeCell = styled.div`
   font-size: 0.85rem;
   color: ${({ theme }) => theme.colors.secondary};
   white-space: nowrap;
+`;
+
+const ActionsCell = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ViewButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(13, 148, 136, 0.1);
+  color: ${({ theme }) => theme.colors.accent};
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  svg {
+    stroke: ${({ theme }) => theme.colors.accent};
+  }
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.accent};
+    transform: scale(1.1);
+    
+    svg {
+      stroke: white;
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
 `;
 
 const ActionButton = styled.button`

@@ -29,7 +29,9 @@ from .serializers import (
     ErrorResponseSerializer,
     DeleteSessionResponseSerializer,
     GetSessionMessagesResponseSerializer,
-    ListSessionsResponseSerializer
+    ListSessionsResponseSerializer,
+    RenameSessionSerializer,
+    RenameSessionResponseSerializer
 )
 from ..agents.chatbot.chatbot import Chatbot, ChatRequest
 # from ..agents.kg_constructor.neo4j_client import Neo4jClient
@@ -346,6 +348,74 @@ def list_sessions(request):
         
     except Exception as e:
         logger.error(f"Error in list_sessions: {e}")
+        return Response(
+            {'error': 'Internal server error', 'details': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@extend_schema(
+    tags=['Chatbot'],
+    summary='Rename a chat session',
+    description='''
+    Update the title of an existing chat session.
+    ''',
+    request=RenameSessionSerializer,
+    responses={
+        200: RenameSessionResponseSerializer,
+        400: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+        404: ErrorResponseSerializer
+    },
+    parameters=[
+        OpenApiParameter(
+            name='session_id',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description='The session ID to rename'
+        )
+    ]
+)
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def rename_session(request, session_id):
+    """
+    Rename a chat session.
+    """
+    try:
+        # Validate input
+        serializer = RenameSessionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'error': 'Invalid input', 'details': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get session
+        chat_session = get_object_or_404(
+            ChatSession,
+            session_id=session_id,
+            user=request.user
+        )
+        
+        old_title = chat_session.title
+        new_title = serializer.validated_data['title']
+        
+        # Update title
+        chat_session.title = new_title
+        chat_session.save(update_fields=['title', 'updated_at'])
+        
+        logger.info(f"Renamed session {session_id} from '{old_title}' to '{new_title}' for user {request.user.id}")
+        return Response({
+            'success': True,
+            'message': 'Session renamed successfully',
+            'session_id': session_id,
+            'old_title': old_title,
+            'new_title': new_title
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error in rename_session: {e}")
         return Response(
             {'error': 'Internal server error', 'details': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -11,6 +11,13 @@ export type Msg = {
   id: string;
   role: "user" | "assistant" | "ai";
   content: string;
+  metadata?: {
+    images?: string[];
+    videos?: Array<{ url: string; thumbnail?: string; title?: string }>;
+    embedCode?: string;
+    embedUrl?: string;
+    [key: string]: any;
+  };
 };
 
 type PreviewData = {
@@ -24,7 +31,11 @@ type PreviewData = {
 
 /* ===================== component ===================== */
 
-// Mock TikTok videos data
+// ============================================================
+// MOCK DATA - COMMENTED OUT FOR PRODUCTION
+// TODO: Replace with real API data from backend
+// ============================================================
+/*
 const MOCK_TIKTOK_VIDEOS: TikTokVideo[] = [
   {
     id: "1",
@@ -62,6 +73,8 @@ const MOCK_TIKTOK_VIDEOS: TikTokVideo[] = [
     embedHtml: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@chankochamdat_/video/7570312514043579656" data-video-id="7570312514043579656" style="max-width: 605px;min-width: 325px;" > <section> <a target="_blank" title="@chankochamdat_" href="https://www.tiktok.com/@chankochamdat_?refer=embed">@chankochamdat_</a> <a title="giaitri" target="_blank" href="https://www.tiktok.com/tag/giaitri?refer=embed">#giaitri</a> <a title="xhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh" target="_blank" href="https://www.tiktok.com/tag/xhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh?refer=embed">#xhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh</a> <a target="_blank" title="♬ nhạc nền - cậu mèo - hà hững hờ" href="https://www.tiktok.com/music/nhạc-nền-cậu-mèo-7564960557393103633?refer=embed">♬ nhạc nền - cậu mèo - hà hững hờ</a> </section> </blockquote>`,
   },
 ];
+*/
+// ============================================================
 
 export default function ChatMessage({
   msg,
@@ -281,8 +294,67 @@ export default function ChatMessage({
               </div>
             )}
 
-            {/* TikTok Videos - Show for assistant messages when done */}
+            {/* Media Content from API metadata */}
+            {done && msg.metadata && (
+              <>
+                {/* Images */}
+                {msg.metadata.images && msg.metadata.images.length > 0 && (
+                  <div className="media-images">
+                    {msg.metadata.images.map((imgUrl: string, idx: number) => (
+                      <img 
+                        key={idx} 
+                        src={imgUrl} 
+                        alt={`Image ${idx + 1}`}
+                        loading="lazy"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Videos */}
+                {msg.metadata.videos && msg.metadata.videos.length > 0 && (
+                  <div className="media-videos">
+                    {msg.metadata.videos.map((video: any, idx: number) => (
+                      <div key={idx} className="video-item">
+                        {video.title && <div className="video-title">{video.title}</div>}
+                        <video 
+                          controls 
+                          poster={video.thumbnail}
+                          preload="metadata"
+                        >
+                          <source src={video.url} />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Embed Code (e.g., TikTok, YouTube, Twitter) */}
+                {msg.metadata.embedCode && (
+                  <div 
+                    className="media-embed"
+                    dangerouslySetInnerHTML={{ __html: msg.metadata.embedCode }}
+                  />
+                )}
+
+                {/* Embed URL (iframe) */}
+                {msg.metadata.embedUrl && (
+                  <div className="media-embed">
+                    <iframe 
+                      src={msg.metadata.embedUrl}
+                      title="Embedded content"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* TikTok Videos - COMMENTED OUT (MOCK DATA)
+            TODO: Replace with real video recommendations from backend API
             {done && <TikTokCarousel videos={MOCK_TIKTOK_VIDEOS} onOpenSwipe={() => setShowSwipeModal(true)} />}
+            */}
 
             <div className="toolbar">
               <button className="tbtn" onClick={copyMarkdown} title="Copy">
@@ -323,7 +395,8 @@ export default function ChatMessage({
       </div>
       </Item>
 
-      {/* TikTok Swipe Modal - Render outside Item to avoid z-index issues */}
+      {/* TikTok Swipe Modal - COMMENTED OUT (MOCK DATA)
+      TODO: Replace with real video recommendations from backend API
       {isAssistant && (
         <TikTokSwipeModal
           videos={MOCK_TIKTOK_VIDEOS}
@@ -331,6 +404,7 @@ export default function ChatMessage({
           onClose={() => setShowSwipeModal(false)}
         />
       )}
+      */}
     </>
   );
 }
@@ -591,6 +665,73 @@ const Item = styled.div`
   .linkcard a {
     color: ${({ theme }) => theme.colors.accent2};
     font-weight: 600;
+  }
+
+  .media-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+  }
+
+  .media-images img {
+    width: 100%;
+    height: auto;
+    border-radius: ${({ theme }) => theme.radii.md};
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .media-images img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .media-videos {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 12px 0;
+  }
+
+  .video-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .video-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  .media-videos video {
+    width: 100%;
+    max-width: 600px;
+    border-radius: ${({ theme }) => theme.radii.md};
+    border: 1px solid ${({ theme }) => theme.colors.border};
+    background: #000;
+  }
+
+  .media-embed {
+    margin: 12px 0;
+    border-radius: ${({ theme }) => theme.radii.md};
+    overflow: hidden;
+    border: 1px solid ${({ theme }) => theme.colors.border};
+  }
+
+  .media-embed iframe {
+    width: 100%;
+    min-height: 400px;
+    border: none;
+    display: block;
+  }
+
+  .media-embed blockquote {
+    margin: 0 !important;
   }
 
   .toolbar {
