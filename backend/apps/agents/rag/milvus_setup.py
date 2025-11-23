@@ -33,7 +33,7 @@ if COLLECTION_NAME not in utility.list_collections():
         FieldSchema(name="platform", dtype=DataType.VARCHAR, max_length=20),
         FieldSchema(name="summary", dtype=DataType.VARCHAR, max_length=4000),
         FieldSchema(name="timestamp", dtype=DataType.INT64),  # Unix timestamp
-        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=768),
+        FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=384),
     ]
 
     schema = CollectionSchema(
@@ -42,7 +42,7 @@ if COLLECTION_NAME not in utility.list_collections():
     collection = Collection(COLLECTION_NAME, schema)
     print("🆕 Created collection:", COLLECTION_NAME)
 
-    # Sử dụng chỉ mục IVF_FLAT, phù hợp cho kích thước 768 chiều
+    # Sử dụng chỉ mục IVF_FLAT, phù hợp cho kích thước 384 chiều
     index_params = {
         "index_type": "IVF_FLAT",
         "metric_type": "COSINE",

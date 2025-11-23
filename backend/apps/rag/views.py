@@ -67,7 +67,7 @@ def add_item_view(request):
     """
     Add a single item to the RAG system.
 
-    The summary will be embedded using Vietnamese SBERT model and stored in Milvus.
+    The summary will be embedded using all-MiniLM-L6-v2 and stored in Milvus.
     Timestamp is optional - defaults to None if not provided.
     """
     s = ItemDataSerializer(data=request.data)

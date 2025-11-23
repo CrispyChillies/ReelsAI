@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 logger = logging.getLogger(__name__)
 
 try:
-    model = SentenceTransformer("keepitreal/vietnamese-sbert")
+    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 except Exception as e:
     logger.exception("Failed to load SentenceTransformer model: %s", e)
     model = None
