@@ -27,3 +27,6 @@ drf-spectacular==0.29.0
 drf-yasg==1.21.11
 django-extensions==4.1
 django_celery_results==2.6.0
+celery==5.5.3
+supabase==2.24.0
+langgraph.checkpoint.postgres==3.0.1
