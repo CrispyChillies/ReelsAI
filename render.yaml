@@ -1,0 +1,116 @@
+# Render Blueprint for ReelsAI
+# This file defines all services needed for the application
+
+services:
+  # Main Django Web Service
+  - type: web
+    name: reelsai-backend
+    runtime: python
+    region: singapore  # Change to your preferred region
+    plan: starter  # Free tier, upgrade to standard/pro as needed
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 600 --graceful-timeout 300 --keep-alive 75 --max-requests 1000 --max-requests-jitter 100 --log-level info --access-logfile - --error-logfile - reelsai.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: False
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reelsai-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: reelsai-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ZILLIZ_URI
+        sync: false
+      - key: ZILLIZ_TOKEN
+        sync: false
+      - key: COLLECTION_NAME
+        value: user_saved_items_embeddings
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: BSKY_USERNAME
+        sync: false
+      - key: BSKY_PASSWORD
+        sync: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: BACKEND_BASE_URL
+        sync: false
+    healthCheckPath: /
+    autoDeploy: true
+    rootDir: backend
+
+  # Celery Worker Service
+  - type: worker
+    name: reelsai-celery-worker
+    runtime: python
+    region: singapore
+    plan: starter
+    buildCommand: "./build.sh"
+    startCommand: "celery -A reelsai worker --loglevel=info --concurrency=2"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: False
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reelsai-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: reelsai-redis
+          type: redis
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          name: reelsai-backend
+          type: web
+          envVarKey: SECRET_KEY
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ZILLIZ_URI
+        sync: false
+      - key: ZILLIZ_TOKEN
+        sync: false
+      - key: COLLECTION_NAME
+        value: user_saved_items_embeddings
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: BSKY_USERNAME
+        sync: false
+      - key: BSKY_PASSWORD
+        sync: false
+    autoDeploy: true
+    rootDir: backend
+
+# Optional: If you want Render to manage your PostgreSQL database
+# databases:
+#   - name: reelsai-db
+#     databaseName: reelsai
+#     region: singapore
+#     plan: starter  # Free tier
+
+# Redis for Celery broker and results backend
+# Note: Redis is not available in free tier, you'll need to use external service
+# or upgrade to paid plan
