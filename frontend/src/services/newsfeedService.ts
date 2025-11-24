@@ -108,4 +108,42 @@ export const newsfeedService = {
     const response = await axiosInstance.post<SaveItemResponse>('/save/', data);
     return response.data;
   },
+  async createVideoFeed(data: CreateFeedRequest): Promise<PersonalFeed> {
+    const response = await axiosInstance.post<PersonalFeed>('/videos/', {
+      ...data,
+      platform: 'tiktok',
+    });
+    return response.data;
+  },
+
+  // Trigger crawl/refresh for a video feed
+  async refreshVideoFeed(feedId: number): Promise<RefreshResponse> {
+    const response = await axiosInstance.post<RefreshResponse>(`/videos/${feedId}/refresh/`);
+    return response.data;
+  },
+
+  // Get video feed items
+  async getVideoFeedItems(feedId: number): Promise<FeedItem[]> {
+    const response = await axiosInstance.get<FeedItem[]>(`/videos/${feedId}/items/`);
+    return response.data;
+  },
+
+  // Get all video feeds
+  async getVideoFeeds(): Promise<PersonalFeed[]> {
+    const response = await axiosInstance.get<PersonalFeed[]>('/videos/');
+    return response.data;
+  },
+
+  // Get single video feed
+  async getVideoFeed(feedId: number): Promise<PersonalFeed> {
+    const response = await axiosInstance.get<PersonalFeed>(`/videos/${feedId}/`);
+    return response.data;
+  },
+
+  // Delete video feed
+  async deleteVideoFeed(feedId: number): Promise<void> {
+    await axiosInstance.delete(`/videos/${feedId}/`);
+  },
 };
+
+

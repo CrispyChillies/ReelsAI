@@ -1,4 +1,4 @@
- import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/toast';
 import { newsfeedService } from '@/services/newsfeedService';
 import type { CreateFeedRequest, FeedItem, SaveItemRequest } from '@/services/newsfeedService';
@@ -40,11 +40,31 @@ export const useNewsfeed = () => {
     },
   });
 
+  // Refresh video feed mutation
+  const refreshVideoFeedMutation = useMutation({
+    mutationFn: (feedId: number) => newsfeedService.refreshVideoFeed(feedId),
+    onSuccess: (_data, feedId) => {
+      notify({ 
+        title: 'Video crawl started', 
+        content: 'AI is finding videos for you...', 
+        tone: 'info' 
+      });
+      // Invalidate video feed items to refetch
+      queryClient.invalidateQueries({ queryKey: ['videoFeedItems', feedId] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || error.message || 'Failed to refresh video feed';
+      notify({ title: 'Refresh failed', content: message, tone: 'error' });
+    },
+  });
+
   return {
     createFeed: createFeedMutation.mutateAsync,
     isCreatingFeed: createFeedMutation.isPending,
     refreshFeed: refreshFeedMutation.mutate,
     isRefreshingFeed: refreshFeedMutation.isPending,
+    refreshVideoFeed: refreshVideoFeedMutation.mutate,
+    isRefreshingVideoFeed: refreshVideoFeedMutation.isPending,
   };
 };
 
@@ -88,11 +108,25 @@ export const useFeedItems = (feedId: number | null, options?: {
   });
 };
 
+// Hook to fetch video feed items with polling
+export const useVideoFeedItems = (feedId: number | null, options?: { 
+  enabled?: boolean;
+  refetchInterval?: number;
+}) => {
+  return useQuery<FeedItem[]>({
+    queryKey: ['videoFeedItems', feedId],
+    queryFn: () => feedId ? newsfeedService.getVideoFeedItems(feedId) : Promise.resolve([]),
+    enabled: options?.enabled !== false && feedId !== null,
+    refetchInterval: options?.refetchInterval || false,
+    staleTime: 30000,
+  });
+};
+
 // Hook to fetch all feeds
 export const useFeeds = () => {
   return useQuery({
     queryKey: ['feeds'],
-    queryFn: () => newsfeedService.getFeeds(),
+  queryFn: () => newsfeedService.getFeeds(),
     staleTime: 60000, // 1 minute
   });
 };

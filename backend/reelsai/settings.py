@@ -59,7 +59,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -67,6 +66,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
 ]
 
 ROOT_URLCONF = "reelsai.urls"
@@ -163,36 +163,21 @@ SIMPLE_JWT = {
 CORS_ALLOW_CREDENTIALS = True
 
 # Comma-separated list of exact origins
-_cors_origins = [o for o in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if o]
-CORS_ALLOWED_ORIGINS = _cors_origins if _cors_origins else ["http://localhost:5173", "http://127.0.0.1:5173"]
+_cors_origins = [
+    o
+    for o in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if o
+]
+CORS_ALLOWED_ORIGINS = (
+    _cors_origins
+    if _cors_origins
+    else ["http://localhost:5173", "http://127.0.0.1:5173"]
+)
 
 # Allow common preview domains
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
     r"^https://.*\.onrender\.com$",
-]
-
-
-# Additional CORS settings for proper preflight handling
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
 ]
 
 SWAGGER_SETTINGS = {
@@ -248,6 +233,8 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Memoria")
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+print(GEMINI_API_KEY)
 
 # # Neo4j Configuration
 # NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")

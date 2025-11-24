@@ -1,112 +1,65 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react"; // Thêm memo vào import
 import styled from "styled-components";
 import { useI18n } from "@/app/i18n";
-import { useNewsfeed, useFeedItems, useSavePost } from "@/hooks/useNewsfeed";
-import type { PersonalFeed } from "@/services/newsfeedService";
+import { useNewsfeed, useFeedItems, useVideoFeedItems, useSavePost } from "@/hooks/useNewsfeed";
+import { newsfeedService, type PersonalFeed, type FeedItem } from "@/services/newsfeedService";
 
-// // Mock data (fallback) - COMMENTED OUT, now using real API
-// const MOCK_POSTS = [
-//   {
-//     id: "1",
-//     platform: "tiktok",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=1",
-//       username: "@cutecats.bsky.social",
-//       displayName: "Cute Cats",
-//     },
-//     content: "Every day I get closer and closer to get a cat for my cat. 🐱💕",
-//     timestamp: "35s",
-//     stats: { likes: 88, comments: 16, shares: 70 },
-//     thumbnail: null,
-//   },
-//   {
-//     id: "2",
-//     platform: "facebook",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=2",
-//       username: "@mochidog.bsky.social",
-//       displayName: "Mochi Dog",
-//     },
-//     content: "Good morning from the fluffiest boy! 🌞🐕",
-//     timestamp: "5m",
-//     stats: { likes: 3000, comments: 70000, shares: 3000 },
-//     thumbnail: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400",
-//   },
-//   {
-//     id: "3",
-//     platform: "tiktok",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=3",
-//       username: "@dannycat.bsky.social",
-//       displayName: "Danny Cat",
-//     },
-//     content: "Miau! Look what I just did!! 😹",
-//     timestamp: "1h",
-//     stats: { likes: 1250, comments: 89, shares: 234 },
-//     thumbnail: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400",
-//   },
-//   {
-//     id: "4",
-//     platform: "facebook",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=4",
-//       username: "@foodlover.social",
-//       displayName: "Food Lover",
-//     },
-//     content: "Just made the perfect pasta carbonara! Recipe in comments 🍝✨",
-//     timestamp: "2h",
-//     stats: { likes: 5420, comments: 312, shares: 891 },
-//     thumbnail: "https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400",
-//   },
-//   {
-//     id: "5",
-//     platform: "tiktok",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=5",
-//       username: "@travelbug.world",
-//       displayName: "Travel Bug",
-//     },
-//     content: "Sunset in Santorini never gets old 🌅💙 #travel #greece",
-//     timestamp: "3h",
-//     stats: { likes: 12500, comments: 456, shares: 2100 },
-//     thumbnail: "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=400",
-//   },
-//   {
-//     id: "6",
-//     platform: "facebook",
-//     user: {
-//       avatar: "https://i.pravatar.cc/150?img=6",
-//       username: "@techguru.dev",
-//       displayName: "Tech Guru",
-//     },
-//     content: "New AI model just dropped! This changes everything in computer vision 🤖💻",
-//     timestamp: "5h",
-//     stats: { likes: 8900, comments: 1200, shares: 3400 },
-//     thumbnail: null,
-//   },
-// ];
+
+// 1. Tạo component Memoized để ngăn React reset DOM
+const TikTokContent = memo(({ html }: { html: string }) => {
+  return <TikTokEmbed dangerouslySetInnerHTML={{ __html: html }} />;
+}, (prev, next) => prev.html === next.html);
 
 export default function NewsfeedPage() {
   useI18n();
-  const [promptValue, setPromptValue] = useState("");
   
-  // Restore state from sessionStorage
-  const [activeFilter, setActiveFilter] = useState(() => {
+  // State for Content Type
+  const [contentType, setContentType] = useState<'posts' | 'reels'>(() => {
     try {
-      return sessionStorage.getItem('newsfeed_activeFilter') || '';
+      return (sessionStorage.getItem('newsfeed_contentType') as 'posts' | 'reels') || 'posts';
     } catch {
-      return '';
+      return 'posts';
     }
   });
-  
-  const [currentFeedId, setCurrentFeedId] = useState<number | null>(() => {
+
+  // Separate state for prompts
+  const [prompts, setPrompts] = useState({
+    posts: "",
+    reels: ""
+  });
+
+  // Separate state for active filters (display text)
+  const [filters, setFilters] = useState({
+    posts: (() => {
+      try { return sessionStorage.getItem('newsfeed_activeFilter') || ''; } catch { return ''; }
+    })(),
+    reels: (() => {
+      try { return sessionStorage.getItem('newsfeed_reelsFilter') || ''; } catch { return ''; }
+    })()
+  });
+
+  // Separate state for feed IDs
+  const [feedIds, setFeedIds] = useState<{posts: number | null, reels: number | null}>(() => {
     try {
-      const stored = sessionStorage.getItem('newsfeed_currentFeedId');
-      return stored ? parseInt(stored, 10) : null;
+      const storedPosts = sessionStorage.getItem('newsfeed_currentFeedId');
+      const storedReels = sessionStorage.getItem('newsfeed_reelsFeedId');
+      return {
+        posts: storedPosts ? parseInt(storedPosts, 10) : null,
+        reels: storedReels ? parseInt(storedReels, 10) : null
+      };
     } catch {
-      return null;
+      return { posts: null, reels: null };
     }
   });
+
+  // Derived state based on current content type
+  const promptValue = prompts[contentType];
+  const activeFilter = filters[contentType];
+  const currentFeedId = feedIds[contentType];
+
+  const setPromptValue = (val: string) => setPrompts(prev => ({ ...prev, [contentType]: val }));
+  const setActiveFilter = (val: string) => setFilters(prev => ({ ...prev, [contentType]: val }));
+  const setCurrentFeedId = (id: number | null) => setFeedIds(prev => ({ ...prev, [contentType]: id }));
   
   const [savedPostIds, setSavedPostIds] = useState<Set<number>>(() => {
     try {
@@ -124,36 +77,36 @@ export default function NewsfeedPage() {
       return false;
     }
   });
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { createFeed, isCreatingFeed, refreshFeed } = useNewsfeed();
+  const { createFeed, isCreatingFeed, refreshFeed, refreshVideoFeed } = useNewsfeed();
   const { savePost, isSaving } = useSavePost();
   
   // Persist state to sessionStorage
   useEffect(() => {
     try {
-      if (activeFilter) {
-        sessionStorage.setItem('newsfeed_activeFilter', activeFilter);
-      } else {
-        sessionStorage.removeItem('newsfeed_activeFilter');
-      }
+      if (filters.posts) sessionStorage.setItem('newsfeed_activeFilter', filters.posts);
+      else sessionStorage.removeItem('newsfeed_activeFilter');
+      
+      if (filters.reels) sessionStorage.setItem('newsfeed_reelsFilter', filters.reels);
+      else sessionStorage.removeItem('newsfeed_reelsFilter');
     } catch (e) {
-      console.error('Failed to save activeFilter:', e);
+      console.error('Failed to save filters:', e);
     }
-  }, [activeFilter]);
+  }, [filters]);
 
   useEffect(() => {
     try {
-      if (currentFeedId !== null) {
-        sessionStorage.setItem('newsfeed_currentFeedId', currentFeedId.toString());
-      } else {
-        sessionStorage.removeItem('newsfeed_currentFeedId');
-      }
+      if (feedIds.posts !== null) sessionStorage.setItem('newsfeed_currentFeedId', feedIds.posts.toString());
+      else sessionStorage.removeItem('newsfeed_currentFeedId');
+
+      if (feedIds.reels !== null) sessionStorage.setItem('newsfeed_reelsFeedId', feedIds.reels.toString());
+      else sessionStorage.removeItem('newsfeed_reelsFeedId');
     } catch (e) {
-      console.error('Failed to save currentFeedId:', e);
+      console.error('Failed to save feedIds:', e);
     }
-  }, [currentFeedId]);
+  }, [feedIds]);
 
   useEffect(() => {
     try {
@@ -170,18 +123,58 @@ export default function NewsfeedPage() {
       console.error('Failed to save isPolling:', e);
     }
   }, [isPolling]);
+
+  // Persist content type
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('newsfeed_contentType', contentType);
+    } catch (e) {
+      console.error('Failed to save contentType:', e);
+    }
+  }, [contentType]);
   
   // Fetch feed items with polling every 5 seconds when we have a feed
-  const { data: feedItems = [], isLoading: isLoadingItems, isFetching } = useFeedItems(
-    currentFeedId,
+  const { data: postItems = [], isLoading: isLoadingPosts, isFetching: isFetchingPosts } = useFeedItems(
+    feedIds.posts,
     { 
-      enabled: currentFeedId !== null && isPolling,
-      refetchInterval: currentFeedId !== null && isPolling ? 5000 : undefined
+      enabled: feedIds.posts !== null && contentType === 'posts' && isPolling,
+      refetchInterval: feedIds.posts !== null && contentType === 'posts' && isPolling ? 5000 : undefined
     }
   );
 
-  // Use real feed items from API (mock data commented out)
-  const posts = feedItems;
+  // Reels Fetching Logic - REPLACED with React Query Hook
+  const { data: reelsItems = [], isLoading: isLoadingReels, isFetching: isFetchingReels } = useVideoFeedItems(
+    feedIds.reels,
+    { 
+      enabled: feedIds.reels !== null && contentType === 'reels' && isPolling,
+      refetchInterval: feedIds.reels !== null && contentType === 'reels' && isPolling ? 5000 : undefined
+    }
+  );
+
+  // Determine which items to show
+  const posts = contentType === 'posts' ? postItems : reelsItems;
+  const isLoadingItems = contentType === 'posts' ? isLoadingPosts : isLoadingReels;
+  const isFetching = contentType === 'posts' ? isFetchingPosts : isFetchingReels;
+
+  // Load TikTok Embed Script
+  useEffect(() => {
+    if (contentType === 'reels' && posts.length > 0) {
+      const timer = setTimeout(() => {
+        const existingScript = document.getElementById('tiktok-embed-script');
+        if (existingScript) {
+          existingScript.remove();
+        }
+
+        const script = document.createElement('script');
+        script.id = 'tiktok-embed-script';
+        script.src = "https://www.tiktok.com/embed.js";
+        script.async = true;
+        document.body.appendChild(script);
+      }, 100); // Giảm delay xuống 100ms cho mượt hơn
+
+      return () => clearTimeout(timer);
+    }
+  }, [contentType, posts.length]); // Chạy lại khi đổi mode hoặc có bài viết mới
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -235,10 +228,15 @@ export default function NewsfeedPage() {
     return () => window.removeEventListener('savedItemRemoved', handleItemRemoved);
   }, []);
 
-  const handleManualRefresh = () => {
+  const handleManualRefresh = async () => {
     if (currentFeedId) {
       setIsPolling(true);
-      refreshFeed(currentFeedId);
+      if (contentType === 'posts') {
+        refreshFeed(currentFeedId);
+      } else {
+        // Use the mutation from hook instead of direct service call
+        refreshVideoFeed(currentFeedId);
+      }
     }
   };
 
@@ -250,21 +248,33 @@ export default function NewsfeedPage() {
     if (!promptValue.trim()) return;
     
     try {
-      // Step 1: Create feed configuration
-      const feed = await createFeed({
-        title: promptValue.slice(0, 50), // Use first 50 chars as title
-        user_intent: promptValue,
-        ranking_style: 'balanced',
-        platform: 'bluesky',
-      }) as PersonalFeed;
+      let feed: PersonalFeed;
 
-      // Step 2: Save feed ID and trigger refresh
+      if (contentType === 'posts') {
+        feed = await createFeed({
+          title: promptValue.slice(0, 50),
+          user_intent: promptValue,
+          ranking_style: 'balanced',
+          platform: 'bluesky',
+        }) as PersonalFeed;
+        
+        refreshFeed(feed.id);
+      } else {
+        // Call Video Service
+        feed = await newsfeedService.createVideoFeed({
+          title: promptValue.slice(0, 50),
+          user_intent: promptValue,
+          ranking_style: 'balanced',
+          platform: 'tiktok',
+        });
+
+        // Trigger refresh using mutation
+        refreshVideoFeed(feed.id);
+      }
+
       setCurrentFeedId(feed.id);
       setActiveFilter(promptValue);
-      setIsPolling(true); // Start polling
-      
-      // Step 3: Trigger crawl (refresh)
-      refreshFeed(feed.id);
+      setIsPolling(true);
       
     } catch (error) {
       console.error('Failed to submit prompt:', error);
@@ -275,7 +285,8 @@ export default function NewsfeedPage() {
     setActiveFilter("");
     setPromptValue("");
     setCurrentFeedId(null);
-    setIsPolling(false); // Stop polling when clearing
+    // No need to manually clear items, React Query handles cache based on feedId
+    setIsPolling(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -309,7 +320,7 @@ export default function NewsfeedPage() {
         ) : (
           <PromptTextarea
             ref={textareaRef}
-            placeholder="Describe the content you want to see"
+            placeholder={contentType === 'reels' ? "Describe the videos you want to see" : "Describe the posts you want to see"}
             value={promptValue}
             onChange={(e) => setPromptValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -322,7 +333,7 @@ export default function NewsfeedPage() {
           <PollingIndicator>
             <PollingDot $isActive={isFetching} />
             <PollingText>
-              {isFetching ? 'Checking for new posts...' : `Auto-refresh enabled • ${feedItems.length} posts`}
+              {isFetching ? 'Checking for new posts...' : `Auto-refresh enabled • ${posts.length} posts`}
             </PollingText>
             <RefreshButton onClick={handleManualRefresh} title="Refresh now">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -336,6 +347,21 @@ export default function NewsfeedPage() {
             </StopPollingButton>
           </PollingIndicator>
         )}
+
+        <ContentTypeSelector>
+          <TypeButton 
+            $isActive={contentType === 'reels'} 
+            onClick={() => setContentType('reels')}
+          >
+            Reels
+          </TypeButton>
+          <TypeButton 
+            $isActive={contentType === 'posts'} 
+            onClick={() => setContentType('posts')}
+          >
+            Posts
+          </TypeButton>
+        </ContentTypeSelector>
       </FloatingFilter>
 
       <FeedColumn>
@@ -343,7 +369,7 @@ export default function NewsfeedPage() {
         {isLoadingItems && currentFeedId && (
           <LoadingState>
             <LoadingSpinner />
-            <LoadingText>AI is finding the best posts for you...</LoadingText>
+            <LoadingText>AI is finding the best {contentType} for you...</LoadingText>
           </LoadingState>
         )}
         
@@ -351,11 +377,11 @@ export default function NewsfeedPage() {
           <EmptyState>
             <EmptyIcon>
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 0 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
               </svg>
             </EmptyIcon>
-            <EmptyText>No posts found yet</EmptyText>
-            <EmptySubtext>AI is still searching. New posts will appear automatically.</EmptySubtext>
+            <EmptyText>No {contentType} found yet</EmptyText>
+            <EmptySubtext>AI is still searching. New {contentType} will appear automatically.</EmptySubtext>
           </EmptyState>
         )}
 
@@ -417,9 +443,9 @@ export default function NewsfeedPage() {
 
               <Content>{post.content}</Content>
 
-              {/* TikTok Embed */}
+              {/* TikTok Embed - Sử dụng component đã memo */}
               {post.embed_quote && post.platform === 'tiktok' && (
-                <TikTokEmbed dangerouslySetInnerHTML={{ __html: post.embed_quote }} />
+                <TikTokContent html={post.embed_quote} />
               )}
 
               {/* Regular thumbnail/media */}
@@ -1081,7 +1107,7 @@ const RefreshButton = styled.button`
   }
 
   &:hover {
-    background: rgba(13, 148, 136, 0.15);
+    background: rgba(13, 148, 136, 0.15);New
     
     svg {
       transform: rotate(180deg);
@@ -1118,20 +1144,28 @@ const TikTokEmbed = styled.div`
   margin: 16px 0;
   border-radius: 12px;
   overflow: hidden;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  background: #f9fafb; /* Màu nền nhẹ trong khi chờ load */
+  min-height: 300px; /* Chiều cao tối thiểu để tránh giật layout */
   
-  /* Style the TikTok embed iframe */
+  /* Style cho iframe khi đã load xong */
   iframe {
     width: 100% !important;
     max-width: 100% !important;
     border-radius: 12px;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   }
 
-  @media (max-width: 768px) {
-    border-radius: 8px;
-    
-    iframe {
-      border-radius: 8px;
-    }
+  /* Style cho blockquote fallback (text hiển thị trước khi video load) */
+  blockquote {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
   }
 `;
 
@@ -1239,4 +1273,46 @@ const AIReasoningText = styled.p`
   color: ${({ theme }) => theme.colors.secondary};
   font-style: italic;
   margin: 6px 0;
+`;
+
+const ContentTypeSelector = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+`;
+
+const TypeButton = styled.button<{ $isActive: boolean }>`
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  background: ${({ $isActive }) => 
+    $isActive 
+      ? 'linear-gradient(135deg, #0d9488 0%, #0d9488 100%)' 
+      : 'rgba(0, 0, 0, 0.05)'
+  };
+  color: ${({ $isActive }) => $isActive ? 'white' : '#64748b'};
+  box-shadow: ${({ $isActive }) => 
+    $isActive 
+      ? '0 4px 12px rgba(127, 29, 29, 0.25)' 
+      : 'none'
+  };
+
+  &:hover {
+    transform: translateY(-1px);
+    background: ${({ $isActive }) => 
+      $isActive 
+        ? 'linear-gradient(135deg, #0d9488 0%, #0d9488 100%)' 
+        : 'rgba(0, 0, 0, 0.08)'
+    };
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
 `;

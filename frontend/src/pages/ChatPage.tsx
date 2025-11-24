@@ -8,6 +8,30 @@ import { useI18n } from "@/app/i18n";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useChatbot, useChatMessages } from "@/hooks/useChatbot";
 
+// Mock Data for TikTok Videos
+const MOCK_VIDEOS = [
+  {
+    idx: 91,
+    id: 92,
+    platform_id: "https://www.tiktok.com/@bink27078/video/7575056327374867725",
+    platform: "tiktok",
+    author: "bink27078",
+    content: "Tag That Friend.😂 #aivideos #ainepal #nepalinews #ainews ",
+    fetched_at: "2025-11-22 10:01:39.509377+00",
+    embed_quote: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@bink27078/video/7575056327374867725" data-video-id="7575056327374867725" data-embed-from="oembed" style="max-width:605px; min-width:325px;"> <section> <a target="_blank" title="@bink27078" href="https://www.tiktok.com/@bink27078?refer=embed">@bink27078</a> <p>Tag That Friend.😂 <a title="aivideos" target="_blank" href="https://www.tiktok.com/tag/aivideos?refer=embed">#aivideos</a> <a title="ainepal" target="_blank" href="https://www.tiktok.com/tag/ainepal?refer=embed">#ainepal</a> <a title="nepalinews" target="_blank" href="https://www.tiktok.com/tag/nepalinews?refer=embed">#nepalinews</a> <a title="ainews" target="_blank" href="https://www.tiktok.com/tag/ainews?refer=embed">#ainews</a> </p> <a target="_blank" title="♬ original sound - Bink" href="https://www.tiktok.com/music/original-sound-7575056329019116302?refer=embed">♬ original sound - Bink</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>`
+  },
+  {
+    idx: 93,
+    id: 94,
+    platform_id: "https://www.tiktok.com/@mattpaige68/video/7436139927001255199",
+    platform: "tiktok",
+    author: "mattpaige68",
+    content: "Your AI news today. Stay up to date on the latest new going on in AI so you dotn get behind. On deck today, art, Open AI and AI chips.",
+    fetched_at: "2025-11-22 10:30:46.462385+00",
+    embed_quote: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@mattpaige68/video/7436139927001255199" data-video-id="7436139927001255199" data-embed-from="oembed" style="max-width:605px; min-width:325px;"> <section> <a target="_blank" title="@mattpaige68" href="https://www.tiktok.com/@mattpaige68?refer=embed">@mattpaige68</a> <p>Your AI news today. Stay up to date on the latest new going on in AI so you dotn get behind. On deck today, art, Open AI and AI chips.  <a title="ainews" target="_blank" href="https://www.tiktok.com/tag/ainews?refer=embed">#ainews</a> <a title="ainewsdaily" target="_blank" href="https://www.tiktok.com/tag/ainewsdaily?refer=embed">#ainewsdaily</a> <a title="openai" target="_blank" href="https://www.tiktok.com/tag/openai?refer=embed">#openai</a> <a title="aiartwork" target="_blank" href="https://www.tiktok.com/tag/aiartwork?refer=embed">#aiartwork</a> <a title="tsmc" target="_blank" href="https://www.tiktok.com/tag/tsmc?refer=embed">#tsmc</a> </p> <a target="_blank" title="♬ original sound - Matt Paige | Learn AI" href="https://www.tiktok.com/music/original-sound-7436139864090741535?refer=embed">♬ original sound - Matt Paige | Learn AI</a> </section> </blockquote> <script async src="https://www.tiktok.com/embed.js"></script>`
+  }
+];
+
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
 const SCROLL_DURATION_MS = 900;
@@ -159,6 +183,25 @@ export default function ChatPage() {
     scrollToBottom(true);
   }, []);
 
+  // Load TikTok Embed Script if messages contain tiktok embeds
+  useEffect(() => {
+    const hasTikTok = messages.some(m => m.content && m.content.includes('tiktok-embed'));
+    if (hasTikTok) {
+      const timer = setTimeout(() => {
+        // Remove existing script to force reload/scan
+        const existingScript = document.getElementById('tiktok-embed-script');
+        if (existingScript) existingScript.remove();
+
+        const script = document.createElement('script');
+        script.id = 'tiktok-embed-script';
+        script.src = "https://www.tiktok.com/embed.js";
+        script.async = true;
+        document.body.appendChild(script);
+      }, 500); // Delay to ensure DOM is ready
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
+
   useLayoutEffect(() => {
     if (autoFollow) scrollToBottom(false);
     else if (messages.length) setUnread((n) => n + 1);
@@ -215,16 +258,56 @@ export default function ChatPage() {
     if (!p?.prompt?.trim()) return;
     setTyping(true);
 
-    try {
-      // Add user message to UI immediately (optimistic update)
-      const uid = crypto.randomUUID();
-      const aid = crypto.randomUUID();
-      setMessages((prev) => [
-        ...prev,
-        { id: uid, role: "user", content: p.prompt },
-        { id: aid, role: "assistant", content: "" },
-      ]);
+    // Add user message to UI immediately (optimistic update)
+    const uid = crypto.randomUUID();
+    const aid = crypto.randomUUID();
+    setMessages((prev) => [
+      ...prev,
+      { id: uid, role: "user", content: p.prompt },
+      { id: aid, role: "assistant", content: "" },
+    ]);
 
+    // --- MOCK RESPONSE LOGIC ---
+    const lowerPrompt = p.prompt.toLowerCase();
+    
+    // Cập nhật điều kiện để bắt câu hỏi trong hình của bạn
+    if (
+      lowerPrompt.includes("tìm video về ai") || 
+      lowerPrompt.includes("mock test") || 
+      lowerPrompt.includes("bài viết về ai") || // Thêm điều kiện này
+      lowerPrompt.includes("cho tôi") // Thêm điều kiện này cho dễ test
+    ) {
+      try {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Select mock data based on prompt nuance or default to first one
+        let mockVideo = MOCK_VIDEOS[0];
+        if (lowerPrompt.includes("news") || lowerPrompt.includes("2")) {
+          mockVideo = MOCK_VIDEOS[1];
+        }
+
+        const responseText = `Video có nội dung AI mà bạn cần tìm được bạn lưu vào ngày ${mockVideo.fetched_at}, có nội dung là "${mockVideo.content}".`;
+        
+        // Append embed code to content
+        // Note: ChatMessage needs to be able to render HTML for this to work
+        const fullContent = `${responseText}\n\n${mockVideo.embed_quote}`;
+
+        setMessages((prev) =>
+          prev.map((m) => 
+            m.id === aid ? { ...m, content: fullContent } : m
+          )
+        );
+      } catch (err) {
+        console.error("Mock error:", err);
+      } finally {
+        setTyping(false);
+      }
+      return; // Skip real API call
+    }
+    // ---------------------------
+
+    try {
       // Send message to backend
       const response = await sendMessage({
         message: p.prompt,
