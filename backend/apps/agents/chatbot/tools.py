@@ -82,6 +82,7 @@ def retrieve_and_answer(query: str, user_id: str, k: int = 5) -> str:
         platforms_found = set()
         
         for i, result in enumerate(results, 1):
+            content_url = result.get('content_url', 'N/A')
             platform = result.get('platform', 'Unknown').title()
             summary = result.get('summary', 'No summary available')
             score = result.get('score', 0.0)
@@ -99,7 +100,7 @@ def retrieve_and_answer(query: str, user_id: str, k: int = 5) -> str:
                     date_str = ""
             
             context_pieces.append(
-                f"Content {i} ({platform}{date_str}, relevance: {score:.3f}):\n{summary}"
+                f"Content {i} ({platform}{date_str} from URL: {content_url}, relevance: {score:.3f}):\n{summary}"
             )
         
         context = "\n\n".join(context_pieces)

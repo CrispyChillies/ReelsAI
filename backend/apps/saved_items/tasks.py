@@ -53,6 +53,7 @@ def push_to_rag_task(saved_item_id):
         # 3. Chuẩn bị Payload gửi sang RAG Service
         rag_payload = {
             "content_id": str(post.id),  # VARCHAR(64) - Dùng ID gốc (URL/URI)
+            "content_url": str(post.platform_id),  # VARCHAR(256) - URL
             "user_id": str(user.id),  # VARCHAR(64)
             "platform": post.platform,  # VARCHAR(20) ('tiktok'/'bluesky')
             "summary": summary_text,  # VARCHAR(4000) - Nội dung text để embedding

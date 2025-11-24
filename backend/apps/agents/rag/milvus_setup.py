@@ -29,6 +29,7 @@ if COLLECTION_NAME not in utility.list_collections():
     fields = [
         FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
         FieldSchema(name="content_id", dtype=DataType.VARCHAR, max_length=64),
+        FieldSchema(name="content_url", dtype=DataType.VARCHAR, max_length=256),
         FieldSchema(name="user_id", dtype=DataType.VARCHAR, max_length=64),
         FieldSchema(name="platform", dtype=DataType.VARCHAR, max_length=20),
         FieldSchema(name="summary", dtype=DataType.VARCHAR, max_length=4000),

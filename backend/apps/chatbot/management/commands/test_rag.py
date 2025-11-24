@@ -75,30 +75,35 @@ class Command(BaseCommand):
                 test_content = [
                     {
                         "content_id": f"tiktok_{user_id}_1",
+                        "content_url": f"https://www.tiktok.com/@{user_id}/video/1",
                         "platform": "tiktok",
                         "summary": "A fun video about cooking Vietnamese pho with traditional ingredients and modern techniques. Shows step-by-step process.",
                         "timestamp": int(time.time() - 86400)  # 1 day ago
                     },
                     {
                         "content_id": f"tiktok_{user_id}_2",
+                        "content_url": f"https://www.tiktok.com/@{user_id}/video/2",
                         "platform": "tiktok", 
                         "summary": "Technology review of the latest smartphone features including camera quality and battery life.",
                         "timestamp": int(time.time() - 172800)  # 2 days ago
                     },
                     {
                         "content_id": f"facebook_{user_id}_1",
+                        "content_url": f"https://www.facebook.com/{user_id}/posts/1",
                         "platform": "facebook",
                         "summary": "Travel blog post about visiting Da Nang, Vietnam with beautiful beach photos and restaurant recommendations.",
                         "timestamp": int(time.time() - 259200)  # 3 days ago
                     },
                     {
-                        "content_id": f"facebook_{user_id}_2", 
+                        "content_id": f"facebook_{user_id}_2",
+                        "content_url": f"https://www.facebook.com/{user_id}/posts/2",
                         "platform": "facebook",
                         "summary": "Discussion about work-life balance in tech industry with personal experiences and tips for remote work.",
                         "timestamp": int(time.time() - 604800)  # 1 week ago
                     },
                     {
                         "content_id": f"tiktok_{user_id}_3",
+                        "content_url": f"https://www.tiktok.com/@{user_id}/video/3",
                         "platform": "tiktok",
                         "summary": "Educational content about machine learning basics and artificial intelligence applications in everyday life.",
                         "timestamp": int(time.time() - 1209600)  # 2 weeks ago
@@ -108,6 +113,7 @@ class Command(BaseCommand):
                 for content in test_content:
                     result = insert_item(
                         content_id=content["content_id"],
+                        content_url=content["content_url"],
                         user_id=user_id,
                         platform=content["platform"],
                         summary=content["summary"],

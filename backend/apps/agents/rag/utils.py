@@ -62,6 +62,7 @@ def _build_columns_for_insert(data_map: Dict[str, Any]) -> List[List[Any]]:
 
 def insert_item(
     content_id: str,
+    content_url: str,
     user_id: str,
     platform: str,
     summary: str,
@@ -75,6 +76,7 @@ def insert_item(
     embedding = model.encode(summary).tolist()
     values_map = {
         "content_id": content_id,
+        "content_url": content_url,
         "user_id": user_id,
         "platform": platform,
         "summary": summary,
@@ -120,7 +122,7 @@ def query_items(
         param=search_params,
         limit=top_k,
         expr=expr,
-        output_fields=["content_id", "summary", "platform"],
+        output_fields=["content_id", "content_url", "summary", "platform", "timestamp"],
     )
 
     hits = []
@@ -130,6 +132,7 @@ def query_items(
             hits.append(
                 {
                     "content_id": ent.get("content_id"),
+                    "content_url": ent.get("content_url"),
                     "summary": ent.get("summary"),
                     "platform": ent.get("platform"),
                     "timestamp": ent.get("timestamp"),

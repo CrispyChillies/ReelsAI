@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 class ItemDataSerializer(serializers.Serializer):
     content_id = serializers.CharField(max_length=64)
+    content_url = serializers.CharField(max_length=200)
     user_id = serializers.CharField(max_length=64)
     platform = serializers.CharField(max_length=20)
     summary = serializers.CharField()

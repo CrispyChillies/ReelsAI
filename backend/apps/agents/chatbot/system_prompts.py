@@ -57,5 +57,6 @@ Instructions:
 - If the content doesn't fully answer the question, say so and provide what information you can
 - Keep the answer conversational, helpful, and well-organized
 - If there are dates, mention the timeline of the content
+- If there are URLs, include them highlighted in the answer.
 
 Answer:"""

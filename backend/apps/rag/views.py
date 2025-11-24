@@ -15,6 +15,7 @@ ADD_ITEM_EXAMPLE = OpenApiExample(
     "AddItemExample",
     value={
         "content_id": "6952571625178975493",
+        "content_url": "https://www.tiktok.com/@strongtherapy/video/6952571625178975493",
         "user_id": "strongtherapy",
         "platform": "tiktok",
         "summary": "Part 2: quality mental healthcare is a privilege. #tiktoktherapy",
@@ -101,6 +102,7 @@ def add_item_view(request):
                         "type": "object",
                         "properties": {
                             "content_id": {"type": "string"},
+                            "content_url": {"type": "string"},
                             "summary": {"type": "string"},
                             "platform": {"type": "string"},
                             "timestamp": {"type": "integer", "nullable": True},

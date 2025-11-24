@@ -332,7 +332,7 @@ class Command(BaseCommand):
         
         return ""
     
-    def _send_to_rag(self, user_id: int, content_id: int, summary: str) -> bool:
+    def _send_to_rag(self, user_id: int, content_id: int, content_url: str, summary: str) -> bool:
         """Send processed content to RAG system"""
         try:
             rag_url = settings.SERVICE_API_URLS["RAG_API_URL"]
@@ -340,6 +340,7 @@ class Command(BaseCommand):
             
             payload = {
                 "content_id": str(content_id),
+                "content_url": str(content_url),
                 "user_id": str(user_id), 
                 "summary": summary,
                 "platform": "tiktok",

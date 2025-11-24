@@ -111,7 +111,8 @@ class Command(BaseCommand):
                 
                 job = {
                     "user_id": user_id,
-                    "content_id": content_id
+                    "content_id": content_id,
+                    "content_url": f"https://www.example.com/content/{content_id}"
                 }
                 
                 channel.basic_publish(
