@@ -10,7 +10,6 @@ import SessionList, {
 } from "@/components/common/chat/SessionList";
 import SearchSessionsModal from "@/components/common/chat/SearchSessionsModal";
 import { useChatSessions } from "@/hooks/useChatbot";
-import type { ChatSession } from "@/types/chatbot";
 
 type Props = { collapsed: boolean; onToggle: () => void };
 
@@ -29,8 +28,6 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
   // Use real API hooks
   const { 
     sessions, 
-    isLoading, 
-    error, 
     fetchSessions, 
     deleteSession: apiDeleteSession,
     renameSession: apiRenameSession

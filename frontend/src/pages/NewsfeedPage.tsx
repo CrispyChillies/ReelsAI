@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, memo } from "react"; // Thêm memo vào im
 import styled from "styled-components";
 import { useI18n } from "@/app/i18n";
 import { useNewsfeed, useFeedItems, useVideoFeedItems, useSavePost } from "@/hooks/useNewsfeed";
-import { newsfeedService, type PersonalFeed, type FeedItem } from "@/services/newsfeedService";
+import { newsfeedService, type PersonalFeed } from "@/services/newsfeedService";
 
 
 // 1. Tạo component Memoized để ngăn React reset DOM

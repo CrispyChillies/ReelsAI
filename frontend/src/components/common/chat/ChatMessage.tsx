@@ -3,8 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import TikTokCarousel, { type TikTokVideo } from "./TikTokCarousel";
-import TikTokSwipeModal from "./TikTokSwipeModal";
 
 /* ===================== types ===================== */
 export type Msg = {
@@ -110,7 +108,6 @@ export default function ChatMessage({
 
   const mdKey = `md-${msg.id}-${normalized.length}`;
   const [copied, setCopied] = useState(false);
-  const [showSwipeModal, setShowSwipeModal] = useState(false);
 
   const copyMarkdown = async () => {
     try {

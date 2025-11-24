@@ -14,10 +14,12 @@ export interface ChatMessage {
 
 export interface ChatSession {
   session_id: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
   title: string | null;
   message_count: number;
+  messages_count: number;
   last_message_timestamp: string | null;
   last_message_preview: string | null;
 }
