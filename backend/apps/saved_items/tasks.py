@@ -11,6 +11,34 @@ from apps.feed.models import FeedItem
 logger = logging.getLogger(__name__)
 
 
+def convert_at_uri_to_url(at_uri: str) -> str:
+    """
+    Convert AT Protocol URI to public Bluesky URL.
+    Example: at://did:plc:vcpqgt4bfahgxralkpjzpwqx/app.bsky.feed.post/3m6glpnf2y22m
+    -> https://bsky.app/profile/did:plc:vcpqgt4bfahgxralkpjzpwqx/post/3m6glpnf2y22m
+    """
+    if not at_uri or not at_uri.startswith("at://"):
+        return at_uri
+    
+    try:
+        # Remove 'at://' prefix
+        path = at_uri[5:]
+        
+        # Split by '/'
+        parts = path.split('/')
+        
+        if len(parts) >= 3:
+            did = parts[0]  # did:plc:xxx
+            rkey = parts[2]  # post id
+            
+            return f"https://bsky.app/profile/{did}/post/{rkey}"
+        
+        return at_uri
+    except Exception as e:
+        logger.warning(f"Failed to convert AT URI to URL: {at_uri} - {e}")
+        return at_uri
+
+
 @shared_task(name="push_to_rag_task")
 def push_to_rag_task(saved_item_id):
     """
@@ -51,9 +79,14 @@ def push_to_rag_task(saved_item_id):
             return
 
         # 3. Chuẩn bị Payload gửi sang RAG Service
+        # Convert AT Protocol URI to public URL for Bluesky posts
+        content_url = str(post.platform_id)
+        if post.platform == "bluesky" and content_url.startswith("at://"):
+            content_url = convert_at_uri_to_url(content_url)
+        
         rag_payload = {
             "content_id": str(post.id),  # VARCHAR(64) - Dùng ID gốc (URL/URI)
-            "content_url": str(post.platform_id),  # VARCHAR(256) - URL
+            "content_url": content_url,  # VARCHAR(256) - Public URL
             "user_id": str(user.id),  # VARCHAR(64)
             "platform": post.platform,  # VARCHAR(20) ('tiktok'/'bluesky')
             "summary": summary_text,  # VARCHAR(4000) - Nội dung text để embedding

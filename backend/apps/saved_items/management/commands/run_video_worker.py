@@ -71,8 +71,8 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, self._signal_handler)
         
         self.queue_name = options['queue_name']
-        self.rabbitmq_host = options['rabbitmq_host']
-        self.rabbitmq_port = options['rabbitmq_port']
+        self.rabbitmq_host = settings.RABBITMQ_HOST or options['rabbitmq_host']
+        self.rabbitmq_port = settings.RABBITMQ_PORT or options['rabbitmq_port']
         self.heartbeat = options['heartbeat']
         self.prefetch_count = options['prefetch_count']
         self.max_retries = options['max_retries']
@@ -110,15 +110,15 @@ class Command(BaseCommand):
             )
             return False
         
-        # Check SERVICE_API_URLS
-        if not hasattr(settings, 'SERVICE_API_URLS') or not settings.SERVICE_API_URLS:
+        # Check SERVICE_URLS
+        if not hasattr(settings, 'SERVICE_URLS') or not settings.SERVICE_URLS:
             self.stdout.write(
-                self.style.ERROR("❌ Missing SERVICE_API_URLS setting")
+                self.style.ERROR("❌ Missing SERVICE_URLS setting")
             )
             return False
         
-        service_urls = settings.SERVICE_API_URLS
-        required_urls = ['VIDEO_UNDERSTANDING_API_URL', 'RAG_API_URL']
+        service_urls = settings.SERVICE_URLS
+        required_urls = ['RAG_API_URL']
         missing_urls = []
         
         for url_key in required_urls:
@@ -128,7 +128,7 @@ class Command(BaseCommand):
         if missing_urls:
             self.stdout.write(
                 self.style.ERROR(
-                    f"❌ Missing required SERVICE_API_URLS: {', '.join(missing_urls)}"
+                    f"❌ Missing required SERVICE_URLS: {', '.join(missing_urls)}"
                 )
             )
             return False
@@ -285,7 +285,7 @@ class Command(BaseCommand):
     
     def _get_video_summary(self, media_url: str) -> str:
         """Get video summary with retry logic"""
-        video_url = settings.SERVICE_API_URLS["VIDEO_UNDERSTANDING_API_URL"]
+        video_url = settings.SERVICE_URLS["VIDEO_UNDERSTANDING_API_URL"]
         
         for attempt in range(self.max_retries):
             try:
@@ -335,7 +335,7 @@ class Command(BaseCommand):
     def _send_to_rag(self, user_id: int, content_id: int, content_url: str, summary: str) -> bool:
         """Send processed content to RAG system"""
         try:
-            rag_url = settings.SERVICE_API_URLS["RAG_API_URL"]
+            rag_url = settings.SERVICE_URLS["RAG_API_URL"]
             self.stdout.write(f"🔍 Sending to RAG system: {rag_url}")
             
             payload = {

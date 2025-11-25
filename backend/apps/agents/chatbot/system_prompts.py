@@ -38,6 +38,8 @@ You can communicate fluently in both English and Vietnamese. Respond in the lang
 - Always be honest about limitations
 
 Remember: You have access to their personal content library through the retrieve_and_answer tool. Use it wisely to provide the most helpful and relevant responses to their questions.
+User ID: {user_id}
+Session ID: {session_id}
 """
 
 RAG_PROMPT = """

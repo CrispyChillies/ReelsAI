@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from logging import getLogger
+from typing import Optional
 
 logger = getLogger(__name__)
 
@@ -60,9 +61,10 @@ class Keywords:
 
     # Platform keywords
     platform = {
-        "facebook": ["facebook", "fb", "meta"],
+        # "facebook": ["facebook", "fb", "meta"],
         # "instagram": ["instagram", "insta"],
         "tiktok": ["tiktok", "tt", "tik tok"],
+        "bluesky": ["bluesky", "bs"],
         # "youtube": ["youtube", "yt"],
         # "twitter": ["twitter", "tweet", "x"],
     }
@@ -109,13 +111,17 @@ class Keywords:
         return keywords
     
     @staticmethod
-    def filter_platform(query: str) -> list[str]:
+    def filter_platform(query: str) -> Optional[list[str]]:
         """List of platforms mentioned in the query"""
         platforms = []
         query_lower = query.lower()
         for platform, kw_list in Keywords.platform.items():
             if any(kw in query_lower for kw in kw_list):
                 platforms.append(platform)
+
+        if not platforms:
+            return None
+        
         return platforms
     
     @staticmethod
@@ -131,7 +137,9 @@ class Keywords:
 
         # Return timestamp if time filter found, otherwise None
         if not times:
-            return None
+            return int((datetime.now() - timedelta(days=30)).timestamp())
+        
+        days = 30
             
         if len(times) > 1:
             logger.info(f"Multiple time filters found in query: {times}. Using 'recent' (30 days).")

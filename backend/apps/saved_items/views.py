@@ -43,6 +43,8 @@ def save_item_view(request):
             },
         )
 
+        print(f"Saved Item: User {request.user.id} saved post {post.id}")
+
         # Trigger task bên app saved_items
         push_to_rag_task.delay(saved_item.id)
 
