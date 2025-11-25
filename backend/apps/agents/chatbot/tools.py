@@ -51,12 +51,6 @@ def retrieve_and_answer(query: str, user_id: str, k: int = 5) -> str:
         # Increase search results for broad queries
         if Keywords.is_broad_search(query):
             top_k = 10
-        
-        print(f'RAG tool: user {user_id}')
-        print(f'RAG tool: query {query}')
-        print(f'RAG tool: top k={top_k}')
-        print(f'RAG tool: from timestamp={time_filter}')
-        print(f'RAG tool: from platform={platform_filter}')
 
         # Query Milvus for relevant content
         search_results = query_items(
@@ -68,7 +62,6 @@ def retrieve_and_answer(query: str, user_id: str, k: int = 5) -> str:
         )
         
         results = search_results.get("results", [])
-        print(f"RAG Tool: Retrieved {len(results)} results")
         filter_info = search_results.get("filter", "")
         
         if not results:

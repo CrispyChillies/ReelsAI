@@ -16,10 +16,17 @@ import time
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, MessagesState
 from langgraph.graph.state import CompiledStateGraph
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import tools_condition, ToolNode
 from django.contrib.auth.models import User
+
+# Try to import PostgresSaver
+POSTGRES_SAVER_AVAILABLE = False
+try:
+    from langgraph.checkpoint.postgres import PostgresSaver
+    POSTGRES_SAVER_AVAILABLE = True
+except ImportError:
+    pass  # Will fall back to MemorySaver
             
 from apps.chatbot.models import ChatSession, ChatMessage
 from ..kg_constructor.config import get_openai_llm
@@ -81,6 +88,7 @@ class Chatbot:
         self.llm = llm or get_openai_llm(model="gpt-4o-mini")
         # self.neo4j_client = neo4j_client
         self.user = user
+        self._checkpointer_context = None  # Store context manager to keep connection alive
                 
         # Build LangGraph workflow
         self.workflow = self._build_workflow()
@@ -89,29 +97,53 @@ class Chatbot:
     
     def _get_checkpointer(self):
         """Get the appropriate checkpointer based on availability"""
+        if not POSTGRES_SAVER_AVAILABLE:
+            logger.info("📝 Using MemorySaver (langgraph-checkpoint-postgres not installed)")
+            return MemorySaver()
+            
         try:
             # Get database connection string from Django settings
             db_settings = connection.settings_dict
             
+            # Check if we have valid connection parameters
+            if not all([db_settings.get('USER'), db_settings.get('PASSWORD'), 
+                       db_settings.get('HOST'), db_settings.get('NAME')]):
+                logger.warning("Incomplete database settings, using MemorySaver")
+                return MemorySaver()
+            
             # Construct PostgreSQL connection string
-            db_url = (
+            db_uri = (
                 f"postgresql://{db_settings['USER']}:{db_settings['PASSWORD']}"
                 f"@{db_settings['HOST']}:{db_settings['PORT']}/{db_settings['NAME']}"
             )
             
-            # Create PostgresSaver with connection
-            checkpointer = PostgresSaver.from_conn_string(db_url)
+            # Add SSL mode if specified
+            ssl_mode = db_settings.get('OPTIONS', {}).get('sslmode')
+            if ssl_mode:
+                db_uri += f"?sslmode={ssl_mode}"
             
-            # Setup tables if they don't exist
+            # Store context manager to keep connection alive
+            self._checkpointer_context = PostgresSaver.from_conn_string(db_uri)
+            checkpointer = self._checkpointer_context.__enter__()
+            
+            # Setup tables if they don't exist (first time use)
             checkpointer.setup()
             
-            logger.info("Using PostgresSaver for persistent checkpoints")
+            logger.info("✅ Using PostgresSaver for persistent conversation history")
             return checkpointer
             
         except Exception as e:
-            logger.error(f"Failed to initialize PostgresSaver: {e}")
-            logger.info("Falling back to MemorySaver")
+            logger.warning(f"⚠️ Failed to initialize PostgresSaver: {e}")
+            logger.info("📝 Falling back to MemorySaver")
             return MemorySaver()
+    
+    def __del__(self):
+        """Clean up database connection when chatbot is destroyed"""
+        if self._checkpointer_context is not None:
+            try:
+                self._checkpointer_context.__exit__(None, None, None)
+            except Exception:
+                pass
     
     def _build_workflow(self) -> CompiledStateGraph:
         """Build the LangGraph workflow with tool integration"""
