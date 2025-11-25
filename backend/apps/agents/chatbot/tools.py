@@ -40,10 +40,13 @@ def retrieve_and_answer(query: str, user_id: str, k: int = 5) -> str:
         # Platform filtering
         platform_filters = Keywords.filter_platform(query)
         logger.info(f"Filtering for platforms: {platform_filters}")
+        # Use first platform if multiple found
+        if platform_filters:
+            platform_filter = platform_filters[0]
         
-        # Time filtering for recent content
-        time_filters = Keywords.filter_time(query)
-        logger.info(f"Filtering for content (last {time_filters} days)")
+        # Time filtering for recent content (returns timestamp)
+        time_filter = Keywords.filter_time(query)
+        logger.info(f"Filtering for content from timestamp: {time_filter}")
         
         # Increase search results for broad queries
         if Keywords.is_broad_search(query):

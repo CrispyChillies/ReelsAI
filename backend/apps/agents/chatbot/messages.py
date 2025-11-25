@@ -120,23 +120,24 @@ class Keywords:
     
     @staticmethod
     def filter_time(query: str) -> int:
-        """List of time filters mentioned in the query"""
+        """Get timestamp filter based on time keywords in query. Returns Unix timestamp or None."""
 
         # Filter out times
         times = []
         query_lower = query.lower()
-        for time_filter, kw_list in Keywords.time_filters.items():
-            if any(kw in query_lower for kw in kw_list):
+        for time_filter, data in Keywords.time_filters.items():
+            if any(kw in query_lower for kw in data["keywords"]):
                 times.append(time_filter)
 
-        # Return days corresponding to the first matched time filter
-        days = 30  # Default to 30 days
-        if times:
-            if len(times) > 1:
-                logger.info(f"Multiple time filters found in query: {times}. Query in the last 30 days will be used.")
-                days = Keywords.time_filters['recent']["days"]
-            else:
-                days = Keywords.time_filters[times[0]]["days"]
+        # Return timestamp if time filter found, otherwise None
+        if not times:
+            return None
+            
+        if len(times) > 1:
+            logger.info(f"Multiple time filters found in query: {times}. Using 'recent' (30 days).")
+            days = Keywords.time_filters['recent']["days"]
+        else:
+            days = Keywords.time_filters[times[0]]["days"]
         
         return int((datetime.now() - timedelta(days=days)).timestamp())
     
